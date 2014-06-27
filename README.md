@@ -3,6 +3,8 @@ filesetsync
 
 Java client-server based rsync-like synchronization of files. Suited for large amounts of files and unattended clients.
 
+The server is a standard Java web application. The synchronization protocol is HTTP-based. Only complete files are synchronized (no partial updates like rsync). Unlike rsync, the file list is cached by the client so data traffic is minimized when synchronizing millions of files. Like rsync, no round-trip is required for streaming multiple small files.
+
 ## filesetsync-client
 
 ### Running
