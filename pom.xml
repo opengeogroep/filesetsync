@@ -1,0 +1,39 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>nl.opengeogroep.filesetsync</groupId>
+    <artifactId>filesetsync</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>filesetsync</name>
+    <url>http://github.com/opengeogroep/filesetsync</url>
+
+    <scm>
+    	<connection>scm:git:git@github.com:opengeogroep/filesetsync.git</connection>
+    	<developerConnection>scm:git:git@github.com:opengeogroep/filesetsync.git</developerConnection>
+    	<url>https://github.com/opengeogroep/filesetsync.git</url>
+    	<tag>HEAD</tag>
+    </scm>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    
+    <dependencies>        
+    </dependencies>
+    
+    <modules>
+        <module>filesetsync-client</module>
+    </modules>
+    
+    <developers>
+        <developer>
+            <name>Matthijs Laan</name>
+            <email>matthijslaan@b3partners.nl</email>
+            <organization>B3Partners B.V. / Coöperatieve Vereniging OpenGeoGroep U.A.</organization>
+            <organizationUrl>http://www.b3partners.nl</organizationUrl>
+        </developer>
+    </developers>
+</project>
