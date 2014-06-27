@@ -72,7 +72,14 @@ public class Fileset implements Comparable {
      */
     @XmlElement(required=true)
     private String direction;
-        
+    
+    /**
+     * Delete local files not existing in server file list, default false. When
+     * uploading the server may decide to ignore deletes.
+     */
+    @XmlElement
+    private boolean delete = false;
+    
     /**
      * Remote name to download files from or upload them to. Either a directory
      * name (meaning recursive) or a single file name.
@@ -133,6 +140,14 @@ public class Fileset implements Comparable {
     
     public void setDirection(String direction) {
         this.direction = direction;
+    }
+
+    public boolean isDelete() {
+        return delete;
+    }
+
+    public void setDelete(boolean delete) {
+        this.delete = delete;
     }
     
     public String getRemote() {
