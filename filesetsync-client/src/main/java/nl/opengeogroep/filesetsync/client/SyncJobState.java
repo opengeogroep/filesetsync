@@ -19,11 +19,13 @@ package nl.opengeogroep.filesetsync.client;
 
 import java.io.Serializable;
 import java.util.Date;
+import java.util.List;
+import nl.opengeogroep.filesetsync.FileRecord;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
 /**
- *
+ * State about synchronizing a Fileset. Includes the file list cache.
  * @author Matthijs Laan
  */
 public class SyncJobState implements Serializable {
@@ -33,14 +35,20 @@ public class SyncJobState implements Serializable {
     public static final String STATE_SCHEDULED = "scheduled";
     public static final String STATE_STARTED = "started";
     public static final String STATE_RETRYING = "retrying";
-    public static final String STATE_COMPLETED_SUCCESS = "completed succesfully";
-    public static final String STATE_COMPLETED_ERROR = "completed with error";
+    public static final String STATE_COMPLETED = "completed";
+    public static final String STATE_ERROR = "error";
     
     private Date lastRun;
     
     private String currentState;
     
+    private String currentAction;
+    
     private Date lastFinished;
+    
+    private Date fileListDate;
+    
+    private List<FileRecord> fileList;
 
     // <editor-fold defaultstate="collapsed" desc="getters and setters">
     public Date getLastRun() {
@@ -58,6 +66,14 @@ public class SyncJobState implements Serializable {
     public void setCurrentState(String currentState) {
         this.currentState = currentState;
     }
+
+    public String getCurrentAction() {
+        return currentAction;
+    }
+
+    public void setCurrentAction(String currentAction) {
+        this.currentAction = currentAction;
+    }
     
     public Date getLastFinished() {
         return lastFinished;
@@ -65,6 +81,22 @@ public class SyncJobState implements Serializable {
     
     public void setLastFinished(Date lastFinished) {
         this.lastFinished = lastFinished;
+    }
+
+    public Date getFileListDate() {
+        return fileListDate;
+    }
+
+    public void setFileListDate(Date fileListDate) {
+        this.fileListDate = fileListDate;
+    }
+
+    public List<FileRecord> getFileList() {
+        return fileList;
+    }
+
+    public void setFileList(List<FileRecord> fileList) {
+        this.fileList = fileList;
     }
     // </editor-fold>
     
@@ -85,7 +117,7 @@ public class SyncJobState implements Serializable {
 
     void endRun(boolean success) {
         setLastFinished(new Date());
-        setCurrentState(success ? STATE_COMPLETED_SUCCESS : STATE_COMPLETED_ERROR);
+        setCurrentState(success ? STATE_COMPLETED : STATE_ERROR);
 
         SyncJobStatePersistence.persist();
     }

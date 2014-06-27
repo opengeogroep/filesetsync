@@ -17,10 +17,25 @@
 
 package nl.opengeogroep.filesetsync.client;
 
-import static nl.opengeogroep.filesetsync.client.util.FormatUtil.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import nl.opengeogroep.filesetsync.FileRecord;
+import nl.opengeogroep.filesetsync.Protocol;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
+import nl.opengeogroep.filesetsync.client.util.FormatUtil;
+import static nl.opengeogroep.filesetsync.client.util.FormatUtil.*;
+import nl.opengeogroep.filesetsync.client.util.HttpClientUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpHeaders;
+import org.apache.http.HttpResponse;
+import static org.apache.http.HttpStatus.*;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
 
 /**
  *
@@ -55,18 +70,84 @@ public class FilesetSyncer {
         }
         serverUrl += "fileset/";
         
-        retrieveFilesetList();
-        compareFilesetList();
-        transferFiles();
-        
-        state.setCurrentState("Retrieving file list");
-
-        
-        log.info("Sync job complete");
-        state.endRun(true);
+        try {
+            retrieveFilesetList();
+            compareFilesetList();
+            transferFiles();
+            
+            log.info("Sync job complete");
+            state.endRun(true);
+        } catch(Exception e) {
+            // TODO: set retry status
+            
+            log.error("Sync job encountered exception", e);
+            state.endRun(false);
+        }
     }
     
-    private void retrieveFilesetList() {
+    private void action(String s) {
+        state.setCurrentAction(s);
+        log.info(s);
+    }
+    
+    private void retrieveFilesetList() throws IOException {
+        
+        final boolean cachedFileList = state.getFileList() != null && state.getFileListDate() != null;
+        
+        String s = "Retrieving file list";
+        if(cachedFileList) {
+            s += String.format(" (last file list with %d files cached at %s",
+                    state.getFileList().size(),
+                    FormatUtil.dateToString(state.getFileListDate()));
+        }
+        action(s);
+        
+        CloseableHttpClient httpClient = HttpClientUtil.get();
+        try {
+            HttpGet get = new HttpGet(serverUrl + "list");
+            if(cachedFileList) {
+                get.addHeader(HttpHeaders.IF_MODIFIED_SINCE, HttpClientUtil.format(state.getFileListDate()));
+            }
+            // Request poorly encoded text format
+            get.addHeader(HttpHeaders.ACCEPT, "text/plain");
+            
+            ResponseHandler<List<FileRecord>> rh = new ResponseHandler<List<FileRecord>>() {
+                public List handleResponse(HttpResponse hr) throws ClientProtocolException, IOException {
+
+                    int status = hr.getStatusLine().getStatusCode();
+                    if(status == SC_NOT_MODIFIED) {
+                        return null;
+                    } else if(status >= SC_OK && status < 300) {
+                        HttpEntity entity = hr.getEntity();
+                        if(entity == null) {
+                            throw new ClientProtocolException("No response entity, invalid server URL?");
+                        }
+                        InputStream in = entity.getContent();
+                        try {
+                            return Protocol.decodeFilelist(in);
+                        } finally {
+                            in.close();
+                        }
+                    } else {
+                        throw new ClientProtocolException("Unexpected response status: " + hr.getStatusLine());
+                    }
+                }
+            };
+
+            List<FileRecord> fileList = httpClient.execute(get, rh);
+
+            if(fileList == null) {
+                log.info("Cached file list is up-to-date");
+            } else {
+                log.info("Filelist returned " + fileList.size() + " files");
+                    
+                for(FileRecord fr: fileList) {
+                    log.info(fr);
+                }
+            }
+        } finally {
+            httpClient.close();
+        }
     }
     
     private void compareFilesetList() {

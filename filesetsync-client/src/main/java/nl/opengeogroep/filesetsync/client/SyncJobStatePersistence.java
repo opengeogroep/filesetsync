@@ -28,6 +28,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
+import nl.opengeogroep.filesetsync.client.util.Version;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -60,17 +61,24 @@ public class SyncJobStatePersistence implements Serializable {
             try {
                 fis = new FileInputStream(f);
                 ObjectInputStream ois = new ObjectInputStream(fis);
-                instance = (SyncJobStatePersistence)ois.readObject();
-                ois.close();
-                instance.cleanup();
-                log.info("Read sync job state from " + f.getAbsolutePath() + ", filesets: " + instance.states.keySet().toString());
-                if(log.isDebugEnabled()) {
-                    for(Map.Entry<String,SyncJobState> entry: instance.states.entrySet()) {
-                        log.debug("Fileset " + entry.getKey() + ": " + entry.getValue().toString());
+                
+                String version = ois.readUTF();
+                
+                if(!Version.getProjectVersion().equals(version)) {
+                    log.info("Sync state saved with version " + version + ", ignoring");
+                } else {
+                    instance = (SyncJobStatePersistence)ois.readObject();
+                    ois.close();
+                    instance.cleanup();
+                    log.info("Read sync job state from " + f.getAbsolutePath() + ", filesets: " + instance.states.keySet().toString());
+                    if(log.isDebugEnabled()) {
+                        for(Map.Entry<String,SyncJobState> entry: instance.states.entrySet()) {
+                            log.debug("Fileset " + entry.getKey() + ": " + entry.getValue().toString());
+                        }
                     }
                 }
             } catch(Exception e) {
-                log.error("Error reading sync job state from " + f.getAbsolutePath(), e);
+                log.error("Error reading sync job state from " + f.getAbsolutePath() + ", starting with new state", e);
                 instance = new SyncJobStatePersistence();
             } finally {
                 IOUtils.closeQuietly(fis);
@@ -84,6 +92,7 @@ public class SyncJobStatePersistence implements Serializable {
         try {
             fos = new FileOutputStream(f);
             ObjectOutputStream oos = new ObjectOutputStream(fos);
+            oos.writeUTF(Version.getProjectVersion());
             oos.writeObject(instance);
             oos.close();
         } catch(Exception e) {

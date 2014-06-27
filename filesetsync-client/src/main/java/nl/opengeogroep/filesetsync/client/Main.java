@@ -29,7 +29,7 @@ public final class Main {
         
         log.info(String.format("%s %s starting",
                 Version.getProperty("project.name"),
-                Version.getProperty("project.version")));
+                Version.getProjectVersion()));
         
         StringWriter sw = new StringWriter();
         Version.getProperties().list(new PrintWriter(sw));

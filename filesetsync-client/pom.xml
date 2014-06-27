@@ -48,7 +48,12 @@
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
             <version>4.3.4</version>
-        </dependency>        
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>filesetsync-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
     
     <build>

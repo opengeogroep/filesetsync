@@ -50,4 +50,8 @@ public class Version {
     public static String getProperty(String key) {
         return properties.getProperty(key);
     }
+    
+    public static String getProjectVersion() {
+        return getProperty("project.version");
+    }
 }
