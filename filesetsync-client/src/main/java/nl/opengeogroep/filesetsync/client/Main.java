@@ -1,13 +1,16 @@
 package nl.opengeogroep.filesetsync.client;
 
-import nl.opengeogroep.filesetsync.client.util.L10n;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.text.MessageFormat;
 import static javax.swing.JOptionPane.*;
 import javax.swing.UIManager;
 import javax.xml.bind.JAXBException;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
+import nl.opengeogroep.filesetsync.client.util.L10n;
+import nl.opengeogroep.filesetsync.client.util.Version;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -23,6 +26,14 @@ public final class Main {
                 UIManager.getSystemLookAndFeelClassName());        
         } catch(Exception e) {
         }
+        
+        log.info(String.format("%s %s starting",
+                Version.getProperty("project.name"),
+                Version.getProperty("project.version")));
+        
+        StringWriter sw = new StringWriter();
+        Version.getProperties().list(new PrintWriter(sw));
+        log.info(sw.toString());
         
         String path, configFile;
         
