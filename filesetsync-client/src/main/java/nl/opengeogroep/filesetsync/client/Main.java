@@ -24,30 +24,38 @@ public final class Main {
         } catch(Exception e) {
         }
         
-        // Determine base path 
-        // Also works for Windows: the URL always contains forward slashes.
+        String path, configFile;
         
-        String path = Main.class.getResource("Main.class").toString();
-        if(path.startsWith("file:")) {
-            // Not in a JAR: file:/some/path/classes/nl/opengeogroep/filesetsync/client/Main.class
-            // Pick directory above directory containing top level package
-            path = path.substring("file:".length());
-            int i = path.indexOf("/nl/opengeogroep/filesetsync/client/Main.class");
-            path = path.substring(0, i);
-            i = path.lastIndexOf("/");
-            path = path.substring(0, i);
+        if(args.length == 2 && "-config".equals(args[0])) {
+            configFile = args[1];
+            path = new File(configFile).getAbsoluteFile().getParent();
         } else {
-            // In a JAR: jar:file:/some/path/filesetsync-client-1.0-SNAPSHOT.jar!/nl/opengeogroep/filesetsync/client/Main.class
-            path = path.substring("jar:file:".length());
-            int i = path.indexOf(".jar!/");
-            // Path to JAR file
-            path = path.substring(0, i+4);
-            i = path.lastIndexOf("/");
-            // Path to directory of JAR file
-            path = path.substring(0, i);
+            // Determine base path 
+            // Also works for Windows: the URL always contains forward slashes.
+
+            path = Main.class.getResource("Main.class").toString();
+            if(path.startsWith("file:")) {
+                // Not in a JAR: file:/some/path/classes/nl/opengeogroep/filesetsync/client/Main.class
+                // Pick directory above directory containing top level package
+                path = path.substring("file:".length());
+                int i = path.indexOf("/nl/opengeogroep/filesetsync/client/Main.class");
+                path = path.substring(0, i);
+                i = path.lastIndexOf("/");
+                path = path.substring(0, i);
+            } else {
+                // In a JAR: jar:file:/some/path/filesetsync-client-1.0-SNAPSHOT.jar!/nl/opengeogroep/filesetsync/client/Main.class
+                path = path.substring("jar:file:".length());
+                int i = path.indexOf(".jar!/");
+                // Path to JAR file
+                path = path.substring(0, i+4);
+                i = path.lastIndexOf("/");
+                // Path to directory of JAR file
+                path = path.substring(0, i);
+            }
+
+            configFile = path + File.separator + "filesetsync-config.xml";
         }
         
-        String configFile = path + File.separator + "filesetsync-config.xml";
         try {
             SyncConfig.load(path, configFile);
         } catch(IOException e) {
