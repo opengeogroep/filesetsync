@@ -104,7 +104,7 @@ public class FilesetSyncer {
         
         CloseableHttpClient httpClient = HttpClientUtil.get();
         try {
-            HttpGet get = new HttpGet(serverUrl + "list");
+            HttpGet get = new HttpGet(serverUrl + fs.getRemote() + "/list");
             if(cachedFileList) {
                 get.addHeader(HttpHeaders.IF_MODIFIED_SINCE, HttpClientUtil.format(state.getFileListDate()));
             }
