@@ -21,8 +21,18 @@
             <version>3.1</version>
             <type>jar</type>
         </dependency>
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.7</version>
+            <type>jar</type>
+        </dependency>
     </dependencies>
 
     <repositories>
     </repositories>
+    <properties>
+        <maven.compiler.source>1.7</maven.compiler.source>
+        <maven.compiler.target>1.7</maven.compiler.target>
+    </properties>
 </project>
