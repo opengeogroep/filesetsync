@@ -27,6 +27,7 @@
     <modules>
         <module>filesetsync-client</module>
         <module>filesetsync-common</module>
+        <module>filesetsync-server</module>
     </modules>
     
     <developers>
