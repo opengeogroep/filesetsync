@@ -85,7 +85,7 @@ public class FileRecord {
         if(SystemUtils.IS_OS_WINDOWS) {
             calculateHashNormalIO(f);
         } else {
-            calculateChecksumMappedIO(f);
+            calculateHashMappedIO(f);
         }
     }
 
@@ -97,7 +97,7 @@ public class FileRecord {
         }
     }
 
-    public void calculateChecksumMappedIO(File f) throws FileNotFoundException, IOException {
+    public void calculateHashMappedIO(File f) throws FileNotFoundException, IOException {
         try (
             RandomAccessFile raf = new RandomAccessFile(f, "r");
             FileChannel channel = raf.getChannel();
