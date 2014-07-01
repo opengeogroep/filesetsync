@@ -95,15 +95,16 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
                         fr.calculateHash(hashTime);
                         files++;
                         totalBytes += fr.getSize();
+                        encoder.write(fr);
                     } catch(IOException e) {
                         log.error("Error calculating hash of " + fr.getFile() + ": " + ExceptionUtils.getMessage(e));
                     }
                 } else if(TYPE_DIRECTORY == fr.getType()) {
                     dirs++;
+                    encoder.write(fr);
                 } else {
                     log.error("Not a file or directory (special or deleted file), ignoring " + fr.getFile());
                 }
-                encoder.write(fr);
             }
             encoder.flush();
 
