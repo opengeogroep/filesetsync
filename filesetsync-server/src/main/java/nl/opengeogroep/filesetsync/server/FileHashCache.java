@@ -105,7 +105,7 @@ public class FileHashCache implements ServletContextListener {
             String[] parts = ((String)e.getObjectValue()).split(",");
             long lastModified = Long.parseLong(parts[0]);
             if(lastModified == fileLastModified) {
-                hash = (String)e.getObjectValue();
+                hash = parts[1];
             }
         }
         if(hash == null) {
