@@ -2,7 +2,7 @@
 <web-app version="2.5" xmlns="http://java.sun.com/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
     <context-param>
         <param-name>filesets</param-name>
-        <param-value>dbk=/var/www/html/nodeless_output/api,voertuigviewer=/var/www/html/nodeless_output</param-value>
+        <param-value>onefile=/home/matthijsln/.bashrc,dbk=/var/www/html/nodeless_output/api,voertuigviewer=/var/www/html/nodeless_output</param-value>
     </context-param>
     <!-- Localization context for the likes of the <fmt:message> JSTL tag -->
     <context-param>

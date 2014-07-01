@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package nl.opengeogroep.filesetsync.client.util;
+package nl.opengeogroep.filesetsync.util;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;

@@ -30,39 +30,39 @@ import org.apache.commons.lang3.builder.ToStringStyle;
  */
 public class SyncJobState implements Serializable {
     private static final long serialVersionUID = 0L;
-    
+
     public static final String STATE_WAITING = "waiting";
     public static final String STATE_SCHEDULED = "scheduled";
     public static final String STATE_STARTED = "started";
     public static final String STATE_RETRYING = "retrying";
     public static final String STATE_COMPLETED = "completed";
     public static final String STATE_ERROR = "error";
-    
+
     private Date lastRun;
-    
+
     private String currentState;
-    
+
     private String currentAction;
-    
+
     private Date lastFinished;
-    
+
     private Date fileListDate;
-    
+
     private List<FileRecord> fileList;
 
     // <editor-fold defaultstate="collapsed" desc="getters and setters">
     public Date getLastRun() {
         return lastRun;
     }
-    
+
     public void setLastRun(Date lastRun) {
         this.lastRun = lastRun;
     }
-    
+
     public String getCurrentState() {
         return currentState;
     }
-    
+
     public void setCurrentState(String currentState) {
         this.currentState = currentState;
     }
@@ -74,11 +74,11 @@ public class SyncJobState implements Serializable {
     public void setCurrentAction(String currentAction) {
         this.currentAction = currentAction;
     }
-    
+
     public Date getLastFinished() {
         return lastFinished;
     }
-    
+
     public void setLastFinished(Date lastFinished) {
         this.lastFinished = lastFinished;
     }
@@ -99,19 +99,19 @@ public class SyncJobState implements Serializable {
         this.fileList = fileList;
     }
     // </editor-fold>
-    
+
     @Override
     public String toString() {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
-                
+
     }
 
     void startNewRun() {
         setLastRun(new Date());
         setCurrentState(STATE_STARTED);
-        
+
         // Clean future fields if necessary, leave lastFinished at old value for now
-        
+
         SyncJobStatePersistence.persist();
     }
 

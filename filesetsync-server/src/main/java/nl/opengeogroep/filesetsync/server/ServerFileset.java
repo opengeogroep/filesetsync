@@ -17,6 +17,14 @@
 
 package nl.opengeogroep.filesetsync.server;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Iterator;
+import nl.opengeogroep.filesetsync.FileRecord;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.filefilter.TrueFileFilter;
+
 /**
  *
  * @author Matthijs Laan
@@ -40,5 +48,53 @@ public class ServerFileset {
 
     public void setPath(String path) {
         this.path = path;
+    }
+
+    /**
+     * Return an Iterable of FileRecords in this fileset recursing into
+     * directories. The resulting FileRecords have no hash calculated.
+     */
+    public Iterable<FileRecord> getFileRecords() throws IOException {
+        final File f = new File(path);
+        if(f.isFile()) {
+            return Arrays.asList(new FileRecord(f, f.getName()));
+        } else {
+            return new Iterable<FileRecord>() {
+                @Override
+                public Iterator<FileRecord> iterator() {
+                    return new FileRecordIterator(f);
+                }
+            };
+        }
+    }
+
+    public static class FileRecordIterator implements Iterator<FileRecord> {
+        private final String rootPath;
+        private final Iterator<File> it;
+
+        public FileRecordIterator(File startDir) {
+            this.rootPath = startDir.getAbsolutePath();
+            it = FileUtils.iterateFilesAndDirs(startDir, TrueFileFilter.INSTANCE, TrueFileFilter.INSTANCE);
+
+            // skip startDir
+            it.next();
+        }
+
+        @Override
+        public FileRecord next() {
+            File f = it.next();
+            String relativePath = f.getAbsolutePath().substring(rootPath.length()+1);
+            return new FileRecord(f, relativePath);
+        }
+
+        @Override
+        public boolean hasNext() {
+            return it.hasNext();
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
     }
 }

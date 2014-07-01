@@ -23,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
+import java.io.Serializable;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
@@ -31,18 +32,20 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.commons.lang3.mutable.MutableLong;
 
 /**
  *
  * @author Matthijs Laan
  */
-public class FileRecord {
+public class FileRecord implements Serializable {
     private static final long serialVersionUID = 0L;
 
-    private static final char TYPE_DIRECTORY = 'd';
-    private static final char TYPE_FILE = 'f';
+    public static final char TYPE_DIRECTORY = 'd';
+    public static final char TYPE_FILE = 'f';
 
     private char type;
+
     /**
      * Path relative to the fileset root.
      */
@@ -54,10 +57,13 @@ public class FileRecord {
 
     private String hash;
 
+    private transient File file;
+
     public FileRecord() {
     }
 
     public FileRecord(File f, String name) {
+        this.file = f;
         if(f.isFile()) {
             type = TYPE_FILE;
             this.size = f.length();
@@ -72,7 +78,17 @@ public class FileRecord {
         this.lastModified = f.lastModified();
     }
 
-    public void calculateHash(File f) throws FileNotFoundException, IOException {
+    public void calculateHash() throws FileNotFoundException, IOException {
+        calculateHash(null);
+    }
+
+    public void calculateHash(MutableLong hashTimeMillisAccumulator) throws FileNotFoundException, IOException {
+        this.hash = calculateHash(file, hashTimeMillisAccumulator);
+    }
+
+    public static String calculateHash(File f, MutableLong hashTimeMillisAccumulator) throws FileNotFoundException, IOException {
+
+        long startTime = hashTimeMillisAccumulator == null ? 0 : System.currentTimeMillis();
 
         // On Windows do not use memory mapped files, because the client may
         // want to overwrite a file it has just calculated the checksum of.
@@ -81,23 +97,23 @@ public class FileRecord {
         // For the server using memory mapped files should be faster as no
         // copying should be required between the OS file cache and the JVM and
         // multiple threads could use the same mapped memory.
+        String hash = SystemUtils.IS_OS_WINDOWS ? calculateHashNormalIO(f) : calculateHashMappedIO(f);
 
-        if(SystemUtils.IS_OS_WINDOWS) {
-            calculateHashNormalIO(f);
-        } else {
-            calculateHashMappedIO(f);
+        if(hashTimeMillisAccumulator != null) {
+            hashTimeMillisAccumulator.add(System.currentTimeMillis() - startTime);
         }
+        return hash;
     }
 
-    public void calculateHashNormalIO(File f) throws FileNotFoundException, IOException {
+    public static String calculateHashNormalIO(File f) throws FileNotFoundException, IOException {
         try (
             InputStream in = new FileInputStream(f);
         ) {
-            hash = DigestUtils.sha1Hex(in);
+            return DigestUtils.sha1Hex(in);
         }
     }
 
-    public void calculateHashMappedIO(File f) throws FileNotFoundException, IOException {
+    public static String calculateHashMappedIO(File f) throws FileNotFoundException, IOException {
         try (
             RandomAccessFile raf = new RandomAccessFile(f, "r");
             FileChannel channel = raf.getChannel();
@@ -109,7 +125,7 @@ public class FileRecord {
             md.update(buffer);
             byte[] digest = md.digest();
 
-            hash = Hex.encodeHexString(digest);
+            return Hex.encodeHexString(digest);
         }
     }
 
@@ -152,6 +168,14 @@ public class FileRecord {
 
     public void setHash(String hash) {
         this.hash = hash;
+    }
+
+    public File getFile() {
+        return file;
+    }
+
+    public void setFile(File file) {
+        this.file = file;
     }
     // </editor-fold>
 
