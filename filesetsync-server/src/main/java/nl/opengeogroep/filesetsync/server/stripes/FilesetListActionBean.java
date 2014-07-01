@@ -31,10 +31,12 @@ import net.sourceforge.stripes.action.StrictBinding;
 import net.sourceforge.stripes.action.UrlBinding;
 import net.sourceforge.stripes.controller.LifecycleStage;
 import nl.opengeogroep.filesetsync.FileRecord;
+import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_FILE;
 import nl.opengeogroep.filesetsync.Protocol;
 import static nl.opengeogroep.filesetsync.Protocol.FILELIST_ENCODING;
 import static nl.opengeogroep.filesetsync.util.FormatUtil.dateToString;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.mutable.MutableLong;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.logging.Log;
@@ -89,14 +91,21 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
             MutableLong hashTime = new MutableLong();
             for(FileRecord fr: iterable) {
                 if(TYPE_FILE == fr.getType()) {
-                    fr.calculateHash(hashTime);
-                    files++;
-                    totalBytes += fr.getSize();
-                } else {
+                    try {
+                        fr.calculateHash(hashTime);
+                        files++;
+                        totalBytes += fr.getSize();
+                    } catch(IOException e) {
+                        log.error("Error calculating hash of " + fr.getFile() + ": " + ExceptionUtils.getMessage(e));
+                    }
+                } else if(TYPE_DIRECTORY == fr.getType()) {
                     dirs++;
+                } else {
+                    log.error("Not a file or directory (special or deleted file), ignoring " + fr.getFile());
                 }
                 encoder.write(fr);
             }
+            encoder.flush();
 
             log.info(String.format("returned %d directories and %d files, total size %d KB, time %s, hash time %s, hash speed %s",
                     dirs,
@@ -106,7 +115,6 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
                     DurationFormatUtils.formatDurationWords(hashTime.getValue(), true, false),
                     (hashTime.getValue() < 100 ? "n/a" : Math.round(totalBytes / 1024.0 / (hashTime.getValue() / 1000.0)) + " KB/s")
             ));
-            encoder.flush();
         }
     }
 
