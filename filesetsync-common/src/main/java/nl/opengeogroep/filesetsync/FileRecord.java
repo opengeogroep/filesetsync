@@ -32,6 +32,9 @@ import java.util.Iterator;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.filefilter.AndFileFilter;
+import org.apache.commons.io.filefilter.CanReadFileFilter;
+import org.apache.commons.io.filefilter.FileFileFilter;
 import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
@@ -46,6 +49,7 @@ public class FileRecord implements Serializable {
 
     public static final char TYPE_DIRECTORY = 'd';
     public static final char TYPE_FILE = 'f';
+    public static final char TYPE_OTHER = 'o';
 
     private char type;
 
@@ -74,7 +78,8 @@ public class FileRecord implements Serializable {
             type = TYPE_DIRECTORY;
             this.size = 0;
         } else {
-            throw new IllegalArgumentException("File " + f + " is not a directory or file");
+            // special or deleted file
+            type = TYPE_OTHER;
         }
 
         this.name = name;
@@ -105,7 +110,7 @@ public class FileRecord implements Serializable {
 
         public FileRecordIterator(File startDir) {
             this.rootPath = startDir.getAbsolutePath();
-            it = FileUtils.iterateFilesAndDirs(startDir, TrueFileFilter.INSTANCE, TrueFileFilter.INSTANCE);
+            it = FileUtils.iterateFilesAndDirs(startDir, new AndFileFilter(FileFileFilter.FILE, CanReadFileFilter.CAN_READ), TrueFileFilter.INSTANCE);
         }
 
         @Override
@@ -147,7 +152,7 @@ public class FileRecord implements Serializable {
         // want to overwrite a file it has just calculated the checksum of.
         // http://bugs.java.com/view_bug.do?bug_id=4724038
 
-        // Performance difference is minimal in some tests
+        // Performance difference is minimal or negative in some tests
 
         //String hash = SystemUtils.IS_OS_WINDOWS ? calculateHashNormalIO(f) : calculateHashMappedIO(f);
         String hash = calculateHashNormalIO(f);
@@ -162,7 +167,7 @@ public class FileRecord implements Serializable {
         try (
             InputStream in = new FileInputStream(f);
         ) {
-            return DigestUtils.sha1Hex(in);
+            return DigestUtils.md5Hex(in);
         }
     }
 
@@ -174,7 +179,7 @@ public class FileRecord implements Serializable {
             MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
             buffer.load();
 
-            MessageDigest md = DigestUtils.getSha1Digest();
+            MessageDigest md = DigestUtils.getMd5Digest();
             md.update(buffer);
             byte[] digest = md.digest();
 
