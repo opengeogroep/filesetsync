@@ -17,10 +17,18 @@
 
 package nl.opengeogroep.filesetsync.client;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import nl.opengeogroep.filesetsync.FileRecord;
+import nl.opengeogroep.filesetsync.Protocol;
+import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
@@ -46,9 +54,9 @@ public class SyncJobState implements Serializable {
 
     private Date lastFinished;
 
-    private Date fileListDate;
+    private String fileListRemotePath;
 
-    private List<FileRecord> fileList;
+    private Date fileListDate;
 
     // <editor-fold defaultstate="collapsed" desc="getters and setters">
     public Date getLastRun() {
@@ -83,6 +91,14 @@ public class SyncJobState implements Serializable {
         this.lastFinished = lastFinished;
     }
 
+    public String getFileListRemotePath() {
+        return fileListRemotePath;
+    }
+
+    public void setFileListRemotePath(String fileListRemotePath) {
+        this.fileListRemotePath = fileListRemotePath;
+    }
+
     public Date getFileListDate() {
         return fileListDate;
     }
@@ -90,15 +106,32 @@ public class SyncJobState implements Serializable {
     public void setFileListDate(Date fileListDate) {
         this.fileListDate = fileListDate;
     }
-
-    public List<FileRecord> getFileList() {
-        return fileList;
-    }
-
-    public void setFileList(List<FileRecord> fileList) {
-        this.fileList = fileList;
-    }
     // </editor-fold>
+
+    public static void writeCachedFileList(String name, List<FileRecord> fileList) throws IOException {
+        try(GZIPOutputStream gzOut = new GZIPOutputStream(new FileOutputStream(getFileListCacheFile(name)))) {
+            Protocol.BufferedFileRecordEncoder encoder = new Protocol.BufferedFileRecordEncoder(gzOut);
+            for(FileRecord fr: fileList) {
+                encoder.write(fr);
+            }
+            encoder.flush();
+        }
+    }
+
+    private static File getFileListCacheFile(String name) {
+        return new File(SyncConfig.getInstance().getVarDir() + File.separator + name + ".filelist.txt.gz");
+    }
+
+    public static boolean haveCachedFileList(String name) {
+        File f = getFileListCacheFile(name);
+        return f.exists() && f.canRead();
+    }
+
+    public static List<FileRecord> readCachedFileList(String name) throws IOException {
+        try(GZIPInputStream gzIn = new GZIPInputStream(new FileInputStream(getFileListCacheFile(name)))) {
+            return Protocol.decodeFilelist(gzIn);
+        }
+    }
 
     @Override
     public String toString() {

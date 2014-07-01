@@ -37,6 +37,7 @@ import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.util.EntityUtils;
 
 /**
  *
@@ -93,13 +94,13 @@ public class FilesetSyncer {
 
     private void retrieveFilesetList() throws IOException {
 
-        final boolean cachedFileList = state.getFileList() != null && state.getFileListDate() != null;
+        final boolean cachedFileList = state.getFileListDate() != null
+                && state.getFileListRemotePath().equals(fs.getRemote())
+                && SyncJobState.haveCachedFileList(fs.getName());
 
         String s = "Retrieving file list";
         if(cachedFileList) {
-            s += String.format(" (last file list with %d files and directories cached at %s)",
-                    state.getFileList().size(),
-                    FormatUtil.dateToString(state.getFileListDate()));
+            s += String.format(" (last file list cached at %s)", FormatUtil.dateToString(state.getFileListDate()));
         }
         action(s);
 
@@ -127,7 +128,8 @@ public class FilesetSyncer {
                             return Protocol.decodeFilelist(in);
                         }
                     } else {
-                        throw new ClientProtocolException("Unexpected response status: " + hr.getStatusLine());
+                        String entity = hr.getEntity() == null ? null : EntityUtils.toString(hr.getEntity());
+                        throw new ClientProtocolException("Unexpected response status: " + hr.getStatusLine() + ",  body: " + entity);
                     }
                 }
             };
@@ -136,6 +138,8 @@ public class FilesetSyncer {
 
             if(fileList == null) {
                 log.info("Cached file list is up-to-date");
+
+                fileList = SyncJobState.readCachedFileList(fs.getName());
             } else {
                 log.info("Filelist returned " + fileList.size() + " files");
 
@@ -148,15 +152,13 @@ public class FilesetSyncer {
                     lastModified = Math.max(lastModified, fr.getLastModified());
                 }
                 if(lastModified != -1) {
-                    state.setFileList(fileList);
+                    state.setFileListRemotePath(fs.getRemote());
                     state.setFileListDate(new Date(lastModified));
+                    SyncJobState.writeCachedFileList(fs.getName(), fileList);
                     SyncJobStatePersistence.persist();
                 }
-
-                for(FileRecord fr: fileList) {
-                    log.info(fr);
-                }
             }
+            log.info("Filelist: " + fileList.size() + " entries");
         }
     }
 

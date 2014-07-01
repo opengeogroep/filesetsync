@@ -29,60 +29,62 @@ import org.apache.commons.logging.LogFactory;
  * @author Matthijs Laan
  */
 public class SyncRunner extends Thread {
-    
+
     private static final Log log = LogFactory.getLog(SyncRunner.class);
-    
+
     static SyncRunner instance;
-    
+
     public static SyncRunner getInstance() {
         if(instance == null) {
             instance = new SyncRunner();
         }
         return instance;
     }
-    
+
     @Override
     public void run() {
         SyncConfig config = SyncConfig.getInstance();
-        
+
         // Never give up
         while(true) {
             /* check all filesets and check in priority order if it should run
              * according to schedule.
              */
 
-            /* We do not use Quartz as it can only persistently store jobs in a 
+            /* We do not use Quartz as it can only persistently store jobs in a
              * database. Using an embedded JavaDB adds stupid amounts of complexity.
              * Downside is we only support a "daily" or "hourly" schedule at the
              * moment.
              */
 
             log.info("Checking filesets to synchronize...");
-            
+
             if(config.getFilesets().isEmpty()) {
                 showMessageDialog(null, L10n.s("filesets.none"));
                 return;
             }
-            
+
             SyncJobStatePersistence statePersistence = SyncJobStatePersistence.getInstance();
-            
+
             // Initialize all states to Waiting
             for(Fileset fs: config.getFilesets()) {
                 SyncJobState state = statePersistence.getState(fs.getName(), true);
                 state.setCurrentState(SyncJobState.STATE_WAITING);
             }
-            
+
             // Iterator is in order of highest priority first
             for(Fileset fs: config.getFilesets()) {
-                
+
                 String schedule = fs.getSchedule();
-                
+
                 if(Fileset.SCHEDULE_ONCE.equals(schedule)) {
+                    // XXX remove from filesets so program exits at all...
                     new FilesetSyncer(fs).sync();
-                } else { 
+                    System.exit(0);
+                } else {
                     throw new UnsupportedOperationException();
                 }
             }
-        }   
+        }
     }
 }

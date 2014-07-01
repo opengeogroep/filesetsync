@@ -27,9 +27,12 @@ import java.io.Serializable;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
+import java.util.Arrays;
+import java.util.Iterator;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.commons.lang3.SystemUtils;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.mutable.MutableLong;
@@ -78,6 +81,56 @@ public class FileRecord implements Serializable {
         this.lastModified = f.lastModified();
     }
 
+    /**
+     * Return an Iterable of FileRecords in this fileset recursing into
+     * directories. The resulting FileRecords have no hash calculated.
+     */
+    public static Iterable<FileRecord> getFileRecordsInDir(String path) throws IOException {
+        final File f = new File(path);
+        if(f.isFile()) {
+            return Arrays.asList(new FileRecord(f, "."));
+        } else {
+            return new Iterable<FileRecord>() {
+                @Override
+                public Iterator<FileRecord> iterator() {
+                    return new FileRecordIterator(f);
+                }
+            };
+        }
+    }
+
+    public static class FileRecordIterator implements Iterator<FileRecord> {
+        private final String rootPath;
+        private final Iterator<File> it;
+
+        public FileRecordIterator(File startDir) {
+            this.rootPath = startDir.getAbsolutePath();
+            it = FileUtils.iterateFilesAndDirs(startDir, TrueFileFilter.INSTANCE, TrueFileFilter.INSTANCE);
+        }
+
+        @Override
+        public FileRecord next() {
+            File f = it.next();
+            String absolutePath = f.getAbsolutePath();
+            if(absolutePath.equals(rootPath)) {
+                // Root directory, set "." as relative name
+                return new FileRecord(f, ".");
+            } else {
+                return new FileRecord(f, absolutePath.substring(rootPath.length()+1));
+            }
+        }
+
+        @Override
+        public boolean hasNext() {
+            return it.hasNext();
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
     public void calculateHash() throws FileNotFoundException, IOException {
         calculateHash(null);
     }
@@ -94,10 +147,10 @@ public class FileRecord implements Serializable {
         // want to overwrite a file it has just calculated the checksum of.
         // http://bugs.java.com/view_bug.do?bug_id=4724038
 
-        // For the server using memory mapped files should be faster as no
-        // copying should be required between the OS file cache and the JVM and
-        // multiple threads could use the same mapped memory.
-        String hash = SystemUtils.IS_OS_WINDOWS ? calculateHashNormalIO(f) : calculateHashMappedIO(f);
+        // Performance difference is minimal in some tests
+
+        //String hash = SystemUtils.IS_OS_WINDOWS ? calculateHashNormalIO(f) : calculateHashMappedIO(f);
+        String hash = calculateHashNormalIO(f);
 
         if(hashTimeMillisAccumulator != null) {
             hashTimeMillisAccumulator.add(System.currentTimeMillis() - startTime);

@@ -30,18 +30,18 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 /**
  * Represents the configuration of a fileset to synchronize (either download or
  * upload).
- * 
+ *
  * @author Matthijs Laan
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 public class Fileset implements Comparable {
     public static final String DIRECTION_DOWNLOAD = "download";
     public static final String DIRECTION_UPLOAD = "upload";
-    
+
     public static final String SCHEDULE_ONCE = "once";
     public static final String SCHEDULE_DAILY = "daily";
     public static final String SCHEDULE_HOURLY = "hourly";
-            
+
     /**
      * Name for identification.
      */
@@ -53,91 +53,91 @@ public class Fileset implements Comparable {
      */
     @XmlAttribute(required=true)
     private String server;
-    
+
     /**
      * Relative priority of this fileset to other filesets. Lower numbers will
      * be prioritized to sync first.
      */
     @XmlElement
     private Double priority;
-    
+
     /**
      * When to synchronize this fileset. No schedule means run once at startup.
      */
     @XmlElement(defaultValue=SCHEDULE_ONCE)
     private String schedule;
-    
+
     /**
      * One of &quot;download&quot; or &quot;upload&quot;.
      */
     @XmlElement(required=true)
     private String direction;
-    
+
     /**
      * Delete local files not existing in server file list, default false. When
      * uploading the server may decide to ignore deletes.
      */
     @XmlElement
     private boolean delete = false;
-    
+
     /**
      * Remote name to download files from or upload them to. Either a directory
      * name (meaning recursive) or a single file name.
      */
     @XmlElement(required=true)
     private String remote;
-    
+
     /**
-     * Local path to save downloaded files to or upload them from. Either a 
+     * Local path to save downloaded files to or upload them from. Either a
      * directory (meaning recursive) or a single file name.
      */
     @XmlElement(required=true)
     private String local;
-    
+
     /**
      * Properties for this fileset.
      */
     @XmlElementWrapper(name="properties")
     @XmlElement(name="property")
-    private List<Property> properties = new ArrayList();    
+    private List<Property> properties = new ArrayList();
 
     // <editor-fold defaultstate="collapsed" desc="getters and setters">
     public String getName() {
         return name;
     }
-    
+
     public void setName(String name) {
         this.name = name;
     }
-    
+
     public String getServer() {
         return server;
     }
-    
+
     public void setServer(String server) {
         this.server = server;
     }
-    
+
     public Double getPriority() {
         return priority;
     }
-    
+
     public void setPriority(Double priority) {
         this.priority = priority;
     }
-    
+
     public String getSchedule() {
         return schedule;
     }
-    
+
     public void setSchedule(String schedule) {
         this.schedule = schedule;
     }
-    
+
     public String getDirection() {
         return direction;
     }
-    
+
     public void setDirection(String direction) {
         this.direction = direction;
     }
@@ -149,27 +149,27 @@ public class Fileset implements Comparable {
     public void setDelete(boolean delete) {
         this.delete = delete;
     }
-    
+
     public String getRemote() {
         return remote;
     }
-    
+
     public void setRemote(String remote) {
         this.remote = remote;
     }
-    
+
     public String getLocal() {
         return local;
     }
-    
+
     public void setLocal(String local) {
         this.local = local;
     }
-    
+
     public List<Property> getProperties() {
         return properties;
     }
-    
+
     public void setProperties(List<Property> properties) {
         this.properties = properties;
     }
@@ -177,7 +177,7 @@ public class Fileset implements Comparable {
 
     public int compareTo(Object other) {
         Fileset rhs = (Fileset)other;
-        
+
         if(rhs.priority == null) {
             // Higher priority
             return -1;
@@ -188,7 +188,7 @@ public class Fileset implements Comparable {
             return priority.compareTo(rhs.priority);
         }
     }
-    
+
     @Override
     public String toString() {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.MULTI_LINE_STYLE);

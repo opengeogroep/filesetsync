@@ -39,17 +39,21 @@ import org.apache.commons.lang3.mutable.MutableLong;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.log4j.MDC;
 
 /**
  *
  * @author Matthijs Laan
  */
 @StrictBinding
-@UrlBinding("/fileset/list/{filesetName}")
+@UrlBinding("/fileset/list/{filesetPath}")
 public class FilesetListActionBean extends FilesetBaseActionBean {
 
     private static final Log log = LogFactory.getLog("api.list");
+
+    @Override
+    protected final String getLogName() {
+        return "api.list";
+    }
 
     private ActionBeanContext context;
 
@@ -107,15 +111,14 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
     }
 
     public Resolution list() throws Exception {
-        MDC.put("fileset", getFileset().getName());
 
         long ifModifiedSince = getContext().getRequest().getDateHeader("If-Modified-Since");
 
         if(ifModifiedSince == -1) {
-            log.trace("begin directory traversal from " + getFileset().getPath());
+            log.trace("begin directory traversal from " + getLocalSubPath());
             // Stream file records directly to output without buffering all
             // records in memory
-            return new FilesetListingResolution(getFileset().getFileRecords());
+            return new FilesetListingResolution(FileRecord.getFileRecordsInDir(getLocalSubPath()));
         } else {
             // A conditional HTTP request with If-Modified-Since is checked
             // against the latest last modified date of all the files and
@@ -124,28 +127,26 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
             // Cache file records in case client cache is outdated and all
             // records must be returned including the hash (not calculated yet)
 
-            // Ideally the fileset is cached once (in memory, a file listing of
-            // a million files is in the order of ~25Mb) including the
-            // checksums and is invalidated by watching the directory using
-            // a Commons-IO FileAlterationObserver or Java 7 WatchService:
-            // http://docs.oracle.com/javase/tutorial/essential/io/notification.html
-            // The performance with filesets with a lot of files and lots of
-            // updates during a re-seeding is of course an issue.
+            // Note: if a file or directory is deleted, the modification time
+            // of the directory containing the file or directory is updated so
+            // deletions do trigger a cache invalidation. The root directory is
+            // included in the file list for this reason.
 
             long lastModified = -1;
             Collection<FileRecord> fileRecords = new ArrayList();
 
-            log.trace("begin directory traversal for conditial http request from " + getFileset().getPath());
-            for(FileRecord fr: getFileset().getFileRecords()) {
+            log.trace("begin directory traversal for conditional http request from " + getLocalSubPath());
+            long startTime = System.currentTimeMillis();
+            for(FileRecord fr: FileRecord.getFileRecordsInDir(getLocalSubPath())) {
                 fileRecords.add(fr);
                 lastModified = Math.max(lastModified, fr.getLastModified());
             }
-
+            String time = DurationFormatUtils.formatDurationWords(System.currentTimeMillis() - startTime, true, false);
             if(ifModifiedSince >= lastModified) {
-                log.info("not modified since " + dateToString(new Date(lastModified)));
+                log.info("not modified since " + dateToString(new Date(lastModified)) + ", took " + time);
                 return new ErrorResolution(HttpServletResponse.SC_NOT_MODIFIED);
             } else {
-                log.info("last modified date " + dateToString(new Date(lastModified)) + " later than client date of " + dateToString(new Date(lastModified)) + ", returning list");
+                log.info("last modified date " + dateToString(new Date(lastModified)) + " later than client date of " + dateToString(new Date(ifModifiedSince)) + ", returning list (time " + time + ")");
                 // Avoid walking dirs twice, only calculate hashes
                 return new FilesetListingResolution(fileRecords);
             }

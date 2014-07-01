@@ -26,7 +26,7 @@ public class Protocol {
         BufferedReader br = new BufferedReader(new InputStreamReader(in, FILELIST_ENCODING));
         String line = br.readLine();
         if(line == null || !"filesetsync:filelist".equals(line)) {
-            throw new IOException("Wrong filelist format returned, bad server URL?");
+            throw new IOException("Wrong filelist format returned, bad server URL? Output: " + line);
         }
         while((line = br.readLine()) != null) {
             String[] s = line.split("\\|");
