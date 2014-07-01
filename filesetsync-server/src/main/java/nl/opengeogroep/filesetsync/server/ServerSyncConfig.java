@@ -18,8 +18,10 @@
 package nl.opengeogroep.filesetsync.server;
 
 import java.io.File;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import org.apache.commons.logging.Log;
@@ -62,6 +64,10 @@ public class ServerSyncConfig implements ServletContextListener {
 
     public ServerFileset getFileset(String name) {
         return filesets.get(name);
+    }
+
+    public Set<String> getFilesetNames() {
+        return Collections.unmodifiableSet(filesets.keySet());
     }
 
     @Override

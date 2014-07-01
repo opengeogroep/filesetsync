@@ -35,6 +35,8 @@ import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_FILE;
 import nl.opengeogroep.filesetsync.Protocol;
 import static nl.opengeogroep.filesetsync.Protocol.FILELIST_ENCODING;
+import nl.opengeogroep.filesetsync.server.FileHashCache;
+import nl.opengeogroep.filesetsync.server.ServerFileset;
 import static nl.opengeogroep.filesetsync.util.FormatUtil.dateToString;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.mutable.MutableLong;
@@ -71,14 +73,16 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
 
     private static class FilesetListingResolution extends StreamingResolution {
 
+        private final ServerFileset fileset;
         private final Iterable<FileRecord> iterable;
 
         private final long startTime;
         private long totalBytes;
         private int dirs, files;
 
-        public FilesetListingResolution(Iterable<FileRecord> iterable) {
+        public FilesetListingResolution(ServerFileset fileset, Iterable<FileRecord> iterable) {
             super("text/plain, encoding=" + FILELIST_ENCODING);
+            this.fileset = fileset;
             this.iterable = iterable;
 
             startTime = System.currentTimeMillis();
@@ -88,15 +92,17 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
         public void stream(HttpServletResponse response) throws IOException  {
             final Protocol.BufferedFileRecordEncoder encoder = new Protocol.BufferedFileRecordEncoder(response.getOutputStream());
 
+            MutableLong hashBytes = new MutableLong();
             MutableLong hashTime = new MutableLong();
             for(FileRecord fr: iterable) {
                 if(TYPE_FILE == fr.getType()) {
                     try {
-                        fr.calculateHash(hashTime);
+                        fr.setHash(FileHashCache.getCachedFileHash(fileset, fr.getFile(), fr.getLastModified(), hashBytes, hashTime));
                         files++;
                         totalBytes += fr.getSize();
                         encoder.write(fr);
                     } catch(IOException e) {
+                        // TODO ClientAbortException
                         log.error("Error calculating hash of " + fr.getFile() + ": " + ExceptionUtils.getMessage(e));
                     }
                 } else if(TYPE_DIRECTORY == fr.getType()) {
@@ -108,18 +114,22 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
             }
             encoder.flush();
 
-            log.info(String.format("returned %d directories and %d files, total size %d KB, time %s, hash time %s, hash speed %s",
+            log.info(String.format("returned %d directories and %d files, total size %d KB, time %s, hashed %d KB (cache hit rate %.1f%%), hash time %s, hash speed %s",
                     dirs,
                     files,
                     totalBytes / 1024,
                     DurationFormatUtils.formatDurationWords(System.currentTimeMillis() - startTime, true, false),
+                    hashBytes.getValue() / 1024,
+                    Math.abs(100-(100.0/totalBytes*hashBytes.getValue())),
                     DurationFormatUtils.formatDurationWords(hashTime.getValue(), true, false),
-                    (hashTime.getValue() < 100 ? "n/a" : Math.round(totalBytes / 1024.0 / (hashTime.getValue() / 1000.0)) + " KB/s")
+                    (hashTime.getValue() < 100 ? "n/a" : Math.round(hashBytes.getValue() / 1024.0 / (hashTime.getValue() / 1000.0)) + " KB/s")
             ));
         }
     }
 
     public Resolution list() throws Exception {
+
+        final ServerFileset theFileset = getFileset();
 
         long ifModifiedSince = getContext().getRequest().getDateHeader("If-Modified-Since");
 
@@ -127,7 +137,8 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
             log.trace("begin directory traversal from " + getLocalSubPath());
             // Stream file records directly to output without buffering all
             // records in memory
-            return new FilesetListingResolution(FileRecord.getFileRecordsInDir(getLocalSubPath()));
+            // return new FilesetListingResolution(ServerFileset.getFileRecordsInDir(getLocalSubPath());
+            return new FilesetListingResolution(theFileset, FileRecord.getFileRecordsInDir(getLocalSubPath()));
         } else {
             // A conditional HTTP request with If-Modified-Since is checked
             // against the latest last modified date of all the files and
@@ -157,7 +168,7 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
             } else {
                 log.info("last modified date " + dateToString(new Date(lastModified)) + " later than client date of " + dateToString(new Date(ifModifiedSince)) + ", returning list (time " + time + ")");
                 // Avoid walking dirs twice, only calculate hashes
-                return new FilesetListingResolution(fileRecords);
+                return new FilesetListingResolution(theFileset, fileRecords);
             }
         }
     }
