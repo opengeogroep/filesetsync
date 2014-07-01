@@ -40,19 +40,19 @@ import org.apache.commons.logging.LogFactory;
 public class SyncJobStatePersistence implements Serializable {
 
     private static final long serialVersionUID = 0L;
-    
+
     private static final Log log = LogFactory.getLog(SyncJobStatePersistence.class);
-    
+
     private static SyncJobStatePersistence instance;
-    
+
     private final Map<String,SyncJobState> states = new HashMap();
-    
+
     public static SyncJobStatePersistence getInstance() {
         return instance;
     }
-    
+
     static void initialize() {
-        
+
         File f = new File(SyncConfig.getInstance().getVarDir() + File.separator + "syncjobstate.dat");
         if(!f.exists()) {
             instance = new SyncJobStatePersistence();
@@ -61,9 +61,9 @@ public class SyncJobStatePersistence implements Serializable {
             try {
                 fis = new FileInputStream(f);
                 ObjectInputStream ois = new ObjectInputStream(fis);
-                
+
                 String version = ois.readUTF();
-                
+
                 if(!Version.getProjectVersion().equals(version)) {
                     log.info("Sync state saved with version " + version + ", ignoring");
                 } else {
@@ -84,8 +84,8 @@ public class SyncJobStatePersistence implements Serializable {
                 IOUtils.closeQuietly(fis);
             }
         }
-    }    
-    
+    }
+
     public static void persist() {
         File f = new File(SyncConfig.getInstance().getVarDir() + File.separator + "syncjobstate.dat");
         FileOutputStream fos = null;
@@ -107,12 +107,12 @@ public class SyncJobStatePersistence implements Serializable {
         for(String name: states.keySet()) {
             if(SyncConfig.getInstance().getFileset(name) == null) {
                 statesToRemove.add(name);
-            }   
+            }
         }
         log.debug("Removing states for filesets not in config file: " + statesToRemove.toString());
         states.keySet().removeAll(statesToRemove);
     }
-    
+
     public SyncJobState getState(String filesetName, boolean create) {
         SyncJobState state = states.get(filesetName);
         if(state == null && create) {

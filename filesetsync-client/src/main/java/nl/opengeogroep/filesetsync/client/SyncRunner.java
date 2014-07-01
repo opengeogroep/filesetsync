@@ -17,10 +17,10 @@
 
 package nl.opengeogroep.filesetsync.client;
 
-import nl.opengeogroep.filesetsync.client.util.L10n;
 import static javax.swing.JOptionPane.showMessageDialog;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
+import nl.opengeogroep.filesetsync.client.util.L10n;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 

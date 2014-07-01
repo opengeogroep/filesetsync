@@ -5,7 +5,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.text.MessageFormat;
-import static javax.swing.JOptionPane.*;
+import static javax.swing.JOptionPane.ERROR_MESSAGE;
+import static javax.swing.JOptionPane.showMessageDialog;
 import javax.swing.UIManager;
 import javax.xml.bind.JAXBException;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
@@ -18,30 +19,30 @@ import org.xml.sax.SAXParseException;
 
 public final class Main {
     private static final Log log = LogFactory.getLog(Main.class);
-    
+
     public static void main(String[] args) {
-        
+
         try {
             UIManager.setLookAndFeel(
-                UIManager.getSystemLookAndFeelClassName());        
+                UIManager.getSystemLookAndFeelClassName());
         } catch(Exception e) {
         }
-        
+
         log.info(String.format("%s %s starting",
                 Version.getProperty("project.name"),
                 Version.getProjectVersion()));
-        
+
         StringWriter sw = new StringWriter();
         Version.getProperties().list(new PrintWriter(sw));
         log.info(sw.toString());
-        
+
         String path, configFile;
-        
+
         if(args.length == 2 && "-config".equals(args[0])) {
             configFile = args[1];
             path = new File(configFile).getAbsoluteFile().getParent();
         } else {
-            // Determine base path 
+            // Determine base path
             // Also works for Windows: the URL always contains forward slashes.
 
             path = Main.class.getResource("Main.class").toString();
@@ -66,7 +67,7 @@ public final class Main {
 
             configFile = path + File.separator + "filesetsync-config.xml";
         }
-        
+
         try {
             SyncConfig.load(path, configFile);
         } catch(IOException e) {
@@ -81,17 +82,17 @@ public final class Main {
             }
             showMessageDialog(null, MessageFormat.format(L10n.s("configfile.bad"),
                     configFile,
-                    message)); 
+                    message));
             System.exit(1);
         }
-        
+
         log.info(SyncConfig.getInstance());
-        
-        File varDir = new File(SyncConfig.getInstance().getVarDir());   
+
+        File varDir = new File(SyncConfig.getInstance().getVarDir());
         if(!varDir.exists()) {
             varDir.mkdirs();
-        }   
-        
+        }
+
         SyncJobStatePersistence.initialize();
         SyncRunner.getInstance().start();
     }
