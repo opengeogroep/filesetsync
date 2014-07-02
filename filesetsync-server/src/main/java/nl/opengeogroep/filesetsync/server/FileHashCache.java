@@ -119,7 +119,7 @@ public class FileHashCache implements ServletContextListener {
 
                     String line;
                     while((line = br.readLine()) != null) {
-                        String[] s = line.split(":");
+                        String[] s = line.split(":", 2);
                         cache.put(new Element(s[0], s[1]));
                     }
                     log.info(String.format("Cache size is %d, read in %s", cache.getSize(), DurationFormatUtils.formatDurationWords(System.currentTimeMillis() - startTime, true, false)));
@@ -167,15 +167,10 @@ public class FileHashCache implements ServletContextListener {
         Element e  = cache.get(canonicalPath);
         String hash = null;
         if(e != null) {
-            String[] parts = ((String)e.getObjectValue()).split(",");
-            try {
-                long lastModified = Long.parseLong(parts[0]);
-                if(lastModified == fileLastModified) {
-                    hash = parts[1];
-                }
-            } catch(java.lang.ArrayIndexOutOfBoundsException ex) {
-                log.error("Index OOB for line \"" + e.getObjectValue());
-                throw ex;
+            String[] parts = ((String)e.getObjectValue()).split(",", 2);
+            long lastModified = Long.parseLong(parts[0]);
+            if(lastModified == fileLastModified) {
+                hash = parts[1];
             }
         }
         if(hash == null) {
