@@ -109,12 +109,12 @@ public class SyncJobState implements Serializable {
     // </editor-fold>
 
     public static void writeCachedFileList(String name, List<FileRecord> fileList) throws IOException {
-        try(GZIPOutputStream gzOut = new GZIPOutputStream(new FileOutputStream(getFileListCacheFile(name)))) {
-            Protocol.BufferedFileRecordEncoder encoder = new Protocol.BufferedFileRecordEncoder(gzOut);
-            for(FileRecord fr: fileList) {
+        try(
+                GZIPOutputStream gzOut = new GZIPOutputStream(new FileOutputStream(getFileListCacheFile(name)));
+                Protocol.BufferedFileRecordEncoder encoder = new Protocol.BufferedFileRecordEncoder(gzOut)) {
+            for (FileRecord fr: fileList) {
                 encoder.write(fr);
             }
-            encoder.flush();
         }
     }
 

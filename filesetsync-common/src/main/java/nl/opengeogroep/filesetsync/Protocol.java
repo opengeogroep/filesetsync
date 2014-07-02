@@ -46,7 +46,7 @@ public class Protocol {
         throw new EOFException(String.format("fileset list not properly ended after reading %d file records, server problem?", l.size()));
     }
 
-    public static class BufferedFileRecordEncoder {
+    public static class BufferedFileRecordEncoder implements AutoCloseable {
         private BufferedWriter writer = null;
 
         private boolean headerWritten = false;
@@ -78,9 +78,10 @@ public class Protocol {
             writer.append(sb);
         }
 
-        public void flush() throws IOException {
+        @Override
+        public void close() throws IOException {
             writer.append("filesetsync:filelist:end\n");
-            writer.flush();
+            writer.close();
         }
     }
 }

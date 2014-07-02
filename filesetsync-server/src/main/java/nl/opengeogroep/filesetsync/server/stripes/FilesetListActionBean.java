@@ -18,9 +18,11 @@
 package nl.opengeogroep.filesetsync.server.stripes;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
+import java.util.zip.GZIPOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import net.sourceforge.stripes.action.ActionBeanContext;
 import net.sourceforge.stripes.action.After;
@@ -71,7 +73,7 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
         this.context = context;
     }
 
-    private static class FilesetListingResolution extends StreamingResolution {
+    private class FilesetListingResolution extends StreamingResolution {
 
         private final ServerFileset fileset;
         private final Iterable<FileRecord> iterable;
@@ -81,7 +83,7 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
         private int dirs, files;
 
         public FilesetListingResolution(ServerFileset fileset, Iterable<FileRecord> iterable) {
-            super("text/plain, encoding=" + FILELIST_ENCODING);
+            super("text/plain");
             this.fileset = fileset;
             this.iterable = iterable;
 
@@ -90,7 +92,19 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
 
         @Override
         public void stream(HttpServletResponse response) throws IOException  {
-            final Protocol.BufferedFileRecordEncoder encoder = new Protocol.BufferedFileRecordEncoder(response.getOutputStream());
+            response.setCharacterEncoding(FILELIST_ENCODING);
+
+            String acceptEncoding = getContext().getRequest().getHeader("Accept-Encoding");
+
+            OutputStream out;
+            if(acceptEncoding != null && acceptEncoding.contains("gzip")) {
+                response.setHeader("Content-Encoding", "gzip");
+                out = new GZIPOutputStream(response.getOutputStream());
+            } else {
+                out = response.getOutputStream();
+            }
+
+            final Protocol.BufferedFileRecordEncoder encoder = new Protocol.BufferedFileRecordEncoder(out);
 
             MutableLong hashBytes = new MutableLong();
             MutableLong hashTime = new MutableLong();
@@ -112,7 +126,8 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
                     log.error("Not a file or directory (special or deleted file), ignoring " + fr.getFile());
                 }
             }
-            encoder.flush();
+            encoder.close();
+            out.close();
 
             log.info(String.format("returned %d directories and %d files, total size %d KB, time %s, hashed %d KB (cache hit rate %.1f%%), hash time %s, hash speed %s",
                     dirs,
