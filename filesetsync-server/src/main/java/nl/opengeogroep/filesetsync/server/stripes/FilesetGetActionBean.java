@@ -20,7 +20,6 @@ package nl.opengeogroep.filesetsync.server.stripes;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
 import javax.servlet.http.HttpServletResponse;
@@ -36,6 +35,7 @@ import nl.opengeogroep.filesetsync.FileRecord;
 import nl.opengeogroep.filesetsync.Protocol;
 import static nl.opengeogroep.filesetsync.Protocol.FILELIST_MIME_TYPE;
 import static nl.opengeogroep.filesetsync.Protocol.MULTIFILE_MIME_TYPE;
+import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -129,26 +129,25 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
 
         @Override
         public void stream(HttpServletResponse response) throws IOException {
-            response.setContentType(FILELIST_MIME_TYPE);
-
             String acceptEncoding = getContext().getRequest().getHeader("Accept-Encoding");
 
-            OutputStream out;
+            CountingOutputStream compressedCounter;
+            CountingOutputStream uncompressedCounter;
             if(acceptEncoding != null && acceptEncoding.contains("gzip")) {
                 response.setHeader("Content-Encoding", "gzip");
-                out = new GZIPOutputStream(response.getOutputStream());
+                compressedCounter = new CountingOutputStream(response.getOutputStream());
+                uncompressedCounter = new CountingOutputStream(new GZIPOutputStream(compressedCounter));
             } else {
-                out = response.getOutputStream();
+                compressedCounter = new CountingOutputStream(response.getOutputStream());
+                uncompressedCounter = compressedCounter;
             }
 
-            final Protocol.MultiFileEncoder streamer = new Protocol.MultiFileEncoder(out, log);
+            final Protocol.MultiFileEncoder streamer = new Protocol.MultiFileEncoder(uncompressedCounter, log);
 
             long startTime = System.currentTimeMillis();
-            long totalBytes = 0;
             for(FileRecord fr: fileRecords) {
                 try {
                     streamer.write(fr);
-                    totalBytes += fr.getSize();
                 } catch(Exception e) {
                     if(e.getClass().getName().endsWith("ClientAbortException")) {
                         log.warn("received client abort streaming " + fr);
@@ -158,12 +157,16 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
                 }
             }
             streamer.close();
-            out.close();
+            uncompressedCounter.close();
+            long compressedBytes = compressedCounter.getByteCount();
+            long uncompressedBytes = uncompressedCounter.getByteCount();
             long duration = System.currentTimeMillis() - startTime;
-            log.info(String.format("streamed %d KB in time %s, %s",
-                    totalBytes / 1024,
+            log.info(String.format("streamed %d KB (uncompressed %d KB, ratio %.1f%%) in %s%s",
+                    compressedBytes / 1024,
+                    uncompressedBytes / 1024,
+                    Math.abs(100-(100.0/uncompressedBytes*compressedBytes)),
                     DurationFormatUtils.formatDurationWords(duration, true, false),
-                    (duration < 100 ? "n/a" : Math.round(totalBytes / 1024.0 / (duration / 1000.0)) + " KB/s")
+                    (duration < 100 ? "n/a" : ", " + Math.round(compressedBytes / 1024.0 / (duration / 1000.0)) + " KB/s")
             ));
 
         }

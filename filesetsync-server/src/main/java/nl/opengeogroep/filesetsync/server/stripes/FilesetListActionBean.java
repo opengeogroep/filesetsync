@@ -137,7 +137,7 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
                     hashBytes.getValue() / 1024,
                     Math.abs(100-(100.0/totalBytes*hashBytes.getValue())),
                     DurationFormatUtils.formatDurationWords(hashTime.getValue(), true, false),
-                    (hashTime.getValue() < 100 ? "n/a" : Math.round(hashBytes.getValue() / 1024.0 / (hashTime.getValue() / 1000.0)) + " KB/s")
+                    (hashTime.getValue() < 100 ? "" : Math.round(hashBytes.getValue() / 1024.0 / (hashTime.getValue() / 1000.0)) + " KB/s")
             ));
         }
     }
