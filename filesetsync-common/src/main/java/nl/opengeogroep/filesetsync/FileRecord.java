@@ -86,6 +86,16 @@ public class FileRecord implements Serializable {
         this.lastModified = f.lastModified();
     }
 
+    public static char typeOf(File file) {
+        if(file.isFile()) {
+            return TYPE_FILE;
+        } else if(file.isDirectory()) {
+            return TYPE_DIRECTORY;
+        } else {
+            return TYPE_OTHER;
+        }
+    }
+
     /**
      * Return an Iterable of FileRecords in this fileset recursing into
      * directories. The resulting FileRecords have no hash calculated.

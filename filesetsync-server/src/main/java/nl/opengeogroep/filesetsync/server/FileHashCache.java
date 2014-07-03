@@ -163,8 +163,14 @@ public class FileHashCache implements ServletContextListener {
 
     public static String getCachedFileHash(ServerFileset fileset, File f, long fileLastModified, MutableLong hashBytesAccumulator, MutableLong hashTimeMillisAccumulator) throws IOException {
         Cache cache = caches.get(fileset.getName());
+        if(cache == null) {
+            // fileset is one file or something went wrong during initialization...
+            String hash = FileRecord.calculateHash(f, hashTimeMillisAccumulator);
+            hashBytesAccumulator.add(f.length());
+            return hash;
+        }
         String canonicalPath = f.getCanonicalPath();
-        Element e  = cache.get(canonicalPath);
+        Element e = cache.get(canonicalPath);
         String hash = null;
         if(e != null) {
             String[] parts = ((String)e.getObjectValue()).split(",", 2);
