@@ -18,6 +18,8 @@
 package nl.opengeogroep.filesetsync.client;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
@@ -27,10 +29,14 @@ import nl.opengeogroep.filesetsync.client.config.Fileset;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import nl.opengeogroep.filesetsync.client.util.HttpClientUtil;
 import nl.opengeogroep.filesetsync.protocol.BufferedFileListEncoder;
+import nl.opengeogroep.filesetsync.protocol.MultiFileDecoder;
+import nl.opengeogroep.filesetsync.protocol.MultiFileHeader;
 import nl.opengeogroep.filesetsync.protocol.Protocol;
 import nl.opengeogroep.filesetsync.util.FormatUtil;
 import static nl.opengeogroep.filesetsync.util.FormatUtil.*;
 import nl.opengeogroep.filesetsync.util.HttpUtil;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpEntity;
@@ -39,6 +45,7 @@ import org.apache.http.HttpResponse;
 import static org.apache.http.HttpStatus.*;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
@@ -59,9 +66,14 @@ public class FilesetSyncer {
     private String serverUrl;
 
     List<FileRecord> fileList;
+    
+    long totalBytes;
 
-    public FilesetSyncer(Fileset fs) {
+    String localCanonicalPath;
+    
+    public FilesetSyncer(Fileset fs) throws IOException {
         this.fs = fs;
+        localCanonicalPath = new File(fs.getLocal()).getCanonicalPath();
         state = SyncJobStatePersistence.getInstance().getState(fs.getName(), true);
     }
 
@@ -186,7 +198,7 @@ public class FilesetSyncer {
         // configured chunk size (unless there are no more files)
 
         long chunks = 0;
-        long totalBytes = 0;
+        totalBytes = 0;
         long chunkSize = FormatUtil.parseByteSize(SyncConfig.getInstance().getProperty("chunkSize","5M"));
 
         int index = 0;
@@ -227,7 +239,65 @@ public class FilesetSyncer {
             post.setEntity(new ByteArrayEntity(b.toByteArray()));
             post.setHeader(HttpHeaders.CONTENT_TYPE, Protocol.FILELIST_MIME_TYPE);
 
+            log.info("Request: " + post.getRequestLine());
+            try(CloseableHttpResponse response = httpClient.execute(post)) {
+                log.info("Response: " + response.getStatusLine());
+                
+                int status = response.getStatusLine().getStatusCode();
+                if(status < 200 || status >= 300) {
+                    throw new IOException(String.format("Server returned \"%s\" for request \"%s\", body: %s", 
+                            response.getStatusLine(), 
+                            post.getRequestLine(), 
+                            EntityUtils.toString(response.getEntity())));
+                }
+                
+                try(MultiFileDecoder decoder = new MultiFileDecoder(response.getEntity().getContent())) {
+                    int i = 0;
+                    for(MultiFileHeader mfh: decoder) {
+                        log.info(String.format("File #%3d: %8d bytes, %s, %s", ++i, mfh.getContentLength(), mfh.getContentType(), mfh.getFilename()));
+                        File local;
+                        if(mfh.getFilename().equals(".")) {
+                            if(mfh.isDirectory()) {
+                                // skip root directory
+                                continue;
+                            } else {
+                                // single file sync, write to local file
+                                local = new File(fs.getLocal());
+                            }
+                        } else {
+                            local = new File(fs.getLocal() + File.separator + mfh.getFilename());
+                            // Detect if server tries to overwrite file in parent of local path
+                            if(!local.getCanonicalPath().startsWith(localCanonicalPath)) {
+                                throw new IOException("Server returned invalid filename: " + mfh.getFilename());
+                            }
+                        }
+                        
+                        if(mfh.isDirectory()) {
+                            log.info("Creating directory " + local.getName());
+                            local.mkdirs();
+                            continue;
+                        }
 
+                        if(local.exists()) {
+                            log.info("Overwriting local file " + local.getName());
+                        } else {
+                            log.info("Writing new file " + local.getName());
+                        }
+                        try(FileOutputStream out = new FileOutputStream(local)) {
+                            IOUtils.copy(mfh.getBody(), out);
+                            totalBytes += mfh.getContentLength();
+                        } catch(IOException e) {
+                            log.error(String.format("Error writing to local file \"%s\": %s", fs.getLocal(), ExceptionUtils.getMessage(e)));
+                            throw e;
+                        }
+                        try {
+                            local.setLastModified(mfh.getLastModified().getTime());
+                        } catch(Exception e) {
+                            log.warn("Exception setting last modified time of " + local.getName() + ": " + ExceptionUtils.getMessage(e));
+                        }
+                    }
+                }
+            }
         }
     }
 }

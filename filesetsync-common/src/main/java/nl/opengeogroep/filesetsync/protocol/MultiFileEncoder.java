@@ -22,8 +22,8 @@ import org.apache.http.entity.ContentType;
  */
 public class MultiFileEncoder implements AutoCloseable {
     public static final String MULTIFILE_MIME_TYPE = "application/x-filesetsync-multifile";
-    private static final String CONTENT_TYPE_DIRECTORY = "application/x-filesetsync-directory";
-    private static final String HEADER_FILENAME = "X-Filesetsync-Filename";
+    static final String CONTENT_TYPE_DIRECTORY = "application/x-filesetsync-directory";
+    static final String HEADER_FILENAME = "X-Filesetsync-Filename";
 
     final private DataOutputStream out;
 

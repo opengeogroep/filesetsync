@@ -17,6 +17,9 @@
 
 package nl.opengeogroep.filesetsync.client;
 
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import static javax.swing.JOptionPane.showMessageDialog;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
@@ -78,8 +81,12 @@ public class SyncRunner extends Thread {
                 String schedule = fs.getSchedule();
 
                 if(Fileset.SCHEDULE_ONCE.equals(schedule)) {
-                    // XXX remove from filesets so program exits at all...
-                    new FilesetSyncer(fs).sync();
+                    try {
+                        // XXX remove from filesets so program exits at all...
+                        new FilesetSyncer(fs).sync();
+                    } catch (IOException ex) {
+                        System.exit(1);
+                    }
                     System.exit(0);
                 } else {
                     throw new UnsupportedOperationException();

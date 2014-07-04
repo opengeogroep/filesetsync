@@ -3,11 +3,15 @@ package nl.opengeogroep.filesetsync.protocol;
 
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.text.ParseException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import static nl.opengeogroep.filesetsync.protocol.MultiFileEncoder.CONTENT_TYPE_DIRECTORY;
+import static nl.opengeogroep.filesetsync.protocol.MultiFileEncoder.HEADER_FILENAME;
 import nl.opengeogroep.filesetsync.util.HttpUtil;
+import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.http.HttpHeaders;
 
 /**
@@ -18,6 +22,8 @@ public class MultiFileHeader {
     final int status;
     final String statusLine;
     final Map<String,String> headers = new HashMap();
+    
+    final InputStream input;
 
     public MultiFileHeader(DataInputStream in) throws IOException {
         status = in.readInt();
@@ -31,9 +37,15 @@ public class MultiFileHeader {
             String value = in.readUTF();
             headers.put(header, value);
         }
+        
+        input = new BoundedInputStream(in, getContentLength());
     }
 
-    public long getContentLength() {
+    public boolean isDirectory() {
+        return getContentType().equals(CONTENT_TYPE_DIRECTORY);
+    }
+    
+    public final long getContentLength() {
         return Long.parseLong(headers.get(HttpHeaders.CONTENT_LENGTH));
     }
 
@@ -44,5 +56,13 @@ public class MultiFileHeader {
     public Date getLastModified() throws ParseException {
         String s = headers.get(HttpHeaders.LAST_MODIFIED);
         return HttpUtil.parseDate(s);
+    }
+    
+    public String getFilename() {
+        return headers.get(HEADER_FILENAME);
+    }
+    
+    public InputStream getBody() {
+        return input;
     }
 }
