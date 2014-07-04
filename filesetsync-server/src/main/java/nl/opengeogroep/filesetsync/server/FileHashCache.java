@@ -15,6 +15,7 @@ import java.util.zip.GZIPOutputStream;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import net.sf.ehcache.Cache;
+import net.sf.ehcache.CacheException;
 import net.sf.ehcache.CacheManager;
 import net.sf.ehcache.Element;
 import net.sf.ehcache.config.CacheConfiguration;
@@ -101,7 +102,13 @@ public class FileHashCache implements ServletContextListener {
                     .persistence(new PersistenceConfiguration().strategy(Strategy.LOCALTEMPSWAP));
             cacheManagerConfig.addCache(cacheConfig);
 
-            CacheManager cacheManager = new CacheManager(cacheManagerConfig);
+            CacheManager cacheManager;
+            try {
+                cacheManager = new CacheManager(cacheManagerConfig);
+            } catch(CacheException e) {
+                log.error(String.format("Error creating cache for \"%s\" at directory \"%s\", hash cache disabled!", fs.getName(), cacheDir), e);
+                continue;
+            }
             cacheManagers.put(name, cacheManager);
             Cache cache = cacheManager.getCache(name);
             caches.put(name, cache);
