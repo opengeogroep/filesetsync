@@ -17,6 +17,7 @@
 
 package nl.opengeogroep.filesetsync.server.stripes;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -106,9 +107,13 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
 
             final BufferedFileListEncoder encoder = new BufferedFileListEncoder(out);
 
+            String cacheDir = new File(FileHashCache.getCacheDir(fileset.getName())).getCanonicalPath();
             MutableLong hashBytes = new MutableLong();
             MutableLong hashTime = new MutableLong();
             for(FileRecord fr: iterable) {
+                if(fr.getFile().getCanonicalPath().startsWith(cacheDir)) {
+                    continue;
+                }
                 if(TYPE_FILE == fr.getType()) {
                     try {
                         fr.setHash(FileHashCache.getCachedFileHash(fileset, fr.getFile(), fr.getLastModified(), hashBytes, hashTime));
@@ -170,9 +175,14 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
             long lastModified = -1;
             Collection<FileRecord> fileRecords = new ArrayList();
 
+            String cacheDir = new File(FileHashCache.getCacheDir(theFileset.getName())).getCanonicalPath();
+            
             log.trace("begin directory traversal for conditional http request from " + getLocalSubPath());
             long startTime = System.currentTimeMillis();
             for(FileRecord fr: FileRecord.getFileRecordsInDir(getLocalSubPath())) {
+                if(fr.getFile().getCanonicalPath().startsWith(cacheDir)) {
+                    continue;
+                }                
                 fileRecords.add(fr);
                 lastModified = Math.max(lastModified, fr.getLastModified());
             }

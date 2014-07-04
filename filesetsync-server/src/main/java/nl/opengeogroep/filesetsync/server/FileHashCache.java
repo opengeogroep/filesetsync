@@ -60,7 +60,7 @@ public class FileHashCache implements ServletContextListener {
     public static Map<String,CacheManager> cacheManagers = new HashMap();
     public static Map<String,Cache> caches = new HashMap();
 
-    private static String getCacheDir(String name) {
+    public static String getCacheDir(String name) {
         return ServerSyncConfig.getInstance().getFileset(name).getPath() + File.separator + CACHE_DIR;
     }
 
