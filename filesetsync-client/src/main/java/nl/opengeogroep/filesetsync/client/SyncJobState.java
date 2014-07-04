@@ -29,7 +29,7 @@ import java.util.zip.GZIPOutputStream;
 import nl.opengeogroep.filesetsync.FileRecord;
 import nl.opengeogroep.filesetsync.protocol.Protocol;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
-import nl.opengeogroep.filesetsync.protocol.BufferedFileRecordEncoder;
+import nl.opengeogroep.filesetsync.protocol.BufferedFileListEncoder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
@@ -112,7 +112,7 @@ public class SyncJobState implements Serializable {
     public static void writeCachedFileList(String name, List<FileRecord> fileList) throws IOException {
         try(
                 GZIPOutputStream gzOut = new GZIPOutputStream(new FileOutputStream(getFileListCacheFile(name)));
-                BufferedFileRecordEncoder encoder = new BufferedFileRecordEncoder(gzOut)) {
+                BufferedFileListEncoder encoder = new BufferedFileListEncoder(gzOut)) {
             for (FileRecord fr: fileList) {
                 encoder.write(fr);
             }

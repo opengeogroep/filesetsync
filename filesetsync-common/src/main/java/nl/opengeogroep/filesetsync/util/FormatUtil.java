@@ -26,9 +26,45 @@ import java.util.Locale;
  * @author Matthijs Laan
  */
 public class FormatUtil {
+
     private static final SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
-        
+
     public static String dateToString(Date d) {
         return format.format(d);
+    }
+
+    public static long parseByteSize(String withSuffix) {
+        String v = withSuffix.trim().toLowerCase();
+        long factor = 1;
+        String n = "";
+        if(v.endsWith("kb")) {
+            factor = 1024;
+            n = v.substring(0, v.length() - 2).trim();
+        } else if (v.endsWith("k")) {
+            factor = 1024;
+            n = v.substring(0, v.length() - 1).trim();
+        } else if (v.endsWith("mb")) {
+            factor = 1024*1024;
+            n = v.substring(0, v.length() - 2).trim();
+        } else if (v.endsWith("m")) {
+            factor = 1024*1024;
+            n = v.substring(0, v.length() - 1).trim();
+        } else if (v.endsWith("gb")) {
+            factor = 1024*1024*1024;
+            n = v.substring(0, v.length() - 2).trim();
+        } else if (v.endsWith("g")) {
+            factor = 1024*1024*1024;
+            n = v.substring(0, v.length() - 1).trim();
+        } else if (v.endsWith("tb")) {
+            factor = 1024*1024*1024*1024;
+            n = v.substring(0, v.length() - 2).trim();
+        } else if (v.endsWith("t")) {
+            factor = 1024*1024*1024*1024;
+            n = v.substring(0, v.length() - 1).trim();
+        } else if (v.endsWith("b")) {
+            factor = 1;
+            n = v.substring(0, v.length() - 1).trim();
+        }
+        return Long.parseLong(n)*factor;
     }
 }

@@ -17,14 +17,17 @@
 
 package nl.opengeogroep.filesetsync.client;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
 import java.util.List;
 import nl.opengeogroep.filesetsync.FileRecord;
-import nl.opengeogroep.filesetsync.protocol.Protocol;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
+import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import nl.opengeogroep.filesetsync.client.util.HttpClientUtil;
+import nl.opengeogroep.filesetsync.protocol.BufferedFileListEncoder;
+import nl.opengeogroep.filesetsync.protocol.Protocol;
 import nl.opengeogroep.filesetsync.util.FormatUtil;
 import static nl.opengeogroep.filesetsync.util.FormatUtil.*;
 import nl.opengeogroep.filesetsync.util.HttpUtil;
@@ -37,6 +40,8 @@ import static org.apache.http.HttpStatus.*;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
 
@@ -52,6 +57,8 @@ public class FilesetSyncer {
     private final Fileset fs;
 
     private String serverUrl;
+
+    List<FileRecord> fileList;
 
     public FilesetSyncer(Fileset fs) {
         this.fs = fs;
@@ -135,7 +142,7 @@ public class FilesetSyncer {
                 }
             };
 
-            List<FileRecord> fileList = httpClient.execute(get, rh);
+            fileList = httpClient.execute(get, rh);
 
             if(fileList == null) {
                 log.info("Cached file list is up-to-date");
@@ -164,8 +171,63 @@ public class FilesetSyncer {
     }
 
     private void compareFilesetList() {
+        // TODO
     }
 
-    private void transferFiles() {
+    private void transferFiles() throws IOException {
+        if(fileList.isEmpty()) {
+            log.info("no files to transfer");
+            return;
+        }
+
+        action(String.format("transferring %d files", fileList.size()));
+
+        // A "chunk" here means a set of multiple files not smaller than the
+        // configured chunk size (unless there are no more files)
+
+        long chunks = 0;
+        long totalBytes = 0;
+        long chunkSize = FormatUtil.parseByteSize(SyncConfig.getInstance().getProperty("chunkSize","5M"));
+
+        int index = 0;
+        int endIndex;
+        do {
+            int thisChunkSize = 0;
+            endIndex = fileList.size()-1;
+            for(int j = index; j < fileList.size(); j++) {
+                thisChunkSize += fileList.get(j).getSize();
+                if(thisChunkSize >= chunkSize) {
+                    endIndex = j;
+                    break;
+                }
+            }
+            List<FileRecord> chunkList = fileList.subList(index, endIndex+1);
+            log.info(String.format("requesting chunk of %d files (size %d KB)", chunkList.size(), thisChunkSize));
+            if(log.isTraceEnabled()) {
+                int t = 0;
+                for(FileRecord fr: chunkList) {
+                    log.trace(String.format("#%3d: %8d bytes: %s", ++t, fr.getSize(), fr.getName()));
+                }
+            }
+            transferChunk(chunkList);
+            index = endIndex+1;
+            chunks++;
+        } while(endIndex < fileList.size()-1);
+
+        log.info(String.format("transfer complete, %d chunks, %d KB total", chunks, totalBytes/1024));
+    }
+
+    private void transferChunk(List<FileRecord> chunkList) throws IOException {
+        try(CloseableHttpClient httpClient = HttpClientUtil.get()) {
+            HttpPost post = new HttpPost(serverUrl + "get/" + fs.getRemote());
+
+            ByteArrayOutputStream b = new ByteArrayOutputStream();
+            new BufferedFileListEncoder(b).writeAll(chunkList).close();
+
+            post.setEntity(new ByteArrayEntity(b.toByteArray()));
+            post.setHeader(HttpHeaders.CONTENT_TYPE, Protocol.FILELIST_MIME_TYPE);
+
+
+        }
     }
 }

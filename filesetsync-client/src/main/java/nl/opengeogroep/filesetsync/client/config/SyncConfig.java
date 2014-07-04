@@ -45,7 +45,7 @@ import org.apache.commons.logging.LogFactory;
 @XmlAccessorType(XmlAccessType.FIELD)
 public class SyncConfig {
     private static final Log log = LogFactory.getLog(SyncConfig.class);
-    
+
     private static SyncConfig instance;
 
     /**
@@ -125,7 +125,7 @@ public class SyncConfig {
         }
 
         Collections.sort(instance.filesets);
-        
+
         File f = new File(instance.varDir);
         if(!f.isAbsolute()) {
             instance.varDir = basePath + File.separator + instance.varDir;
@@ -141,7 +141,16 @@ public class SyncConfig {
         log.debug("Requested fileset not in configuration file by name " + name);
         return null;
     }
-    
+
+    public String getProperty(String name, String defaultValue) {
+        for(Property p: properties) {
+            if(p.getName().equals(name)) {
+                return p.getValue();
+            }
+        }
+        return defaultValue;
+    }
+
     @Override
     public String toString() {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.MULTI_LINE_STYLE);

@@ -13,7 +13,7 @@ import static nl.opengeogroep.filesetsync.protocol.Protocol.FILELIST_ENCODING;
  *
  * @author Matthijs Laan
  */
-public class BufferedFileRecordEncoder implements AutoCloseable {
+public class BufferedFileListEncoder implements AutoCloseable {
     private static final String FILELIST_HEADER_START = "filesetsync:filelist:start";
     private static final String FILELIST_HEADER_END = "filesetsync:filelist:end";
 
@@ -21,7 +21,7 @@ public class BufferedFileRecordEncoder implements AutoCloseable {
 
     private boolean headerWritten = false;
 
-    public BufferedFileRecordEncoder(OutputStream out) {
+    public BufferedFileListEncoder(OutputStream out) {
         try {
             this.writer = new BufferedWriter(new OutputStreamWriter(out, FILELIST_ENCODING));
         } catch (UnsupportedEncodingException ex) {
@@ -46,6 +46,13 @@ public class BufferedFileRecordEncoder implements AutoCloseable {
         sb.append(f.getHash() != null ? f.getHash() : "null");
         sb.append("\n");
         writer.append(sb);
+    }
+
+    public BufferedFileListEncoder writeAll(Iterable<FileRecord> records) throws IOException {
+        for(FileRecord fr: records) {
+            write(fr);
+        }
+        return this;
     }
 
     @Override
