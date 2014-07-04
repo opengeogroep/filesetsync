@@ -32,9 +32,10 @@ import net.sourceforge.stripes.action.UrlBinding;
 import net.sourceforge.stripes.controller.LifecycleStage;
 import nl.b3p.web.stripes.ErrorMessageResolution;
 import nl.opengeogroep.filesetsync.FileRecord;
-import nl.opengeogroep.filesetsync.Protocol;
-import static nl.opengeogroep.filesetsync.Protocol.FILELIST_MIME_TYPE;
-import static nl.opengeogroep.filesetsync.Protocol.MULTIFILE_MIME_TYPE;
+import nl.opengeogroep.filesetsync.protocol.MultiFileEncoder;
+import static nl.opengeogroep.filesetsync.protocol.MultiFileEncoder.MULTIFILE_MIME_TYPE;
+import nl.opengeogroep.filesetsync.protocol.Protocol;
+import static nl.opengeogroep.filesetsync.protocol.Protocol.FILELIST_MIME_TYPE;
 import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.logging.Log;
@@ -142,7 +143,7 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
                 uncompressedCounter = compressedCounter;
             }
 
-            final Protocol.MultiFileEncoder streamer = new Protocol.MultiFileEncoder(uncompressedCounter, log);
+            final MultiFileEncoder streamer = new MultiFileEncoder(uncompressedCounter, log);
 
             long startTime = System.currentTimeMillis();
             for(FileRecord fr: fileRecords) {

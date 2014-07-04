@@ -22,7 +22,7 @@ import java.io.InputStream;
 import java.util.Date;
 import java.util.List;
 import nl.opengeogroep.filesetsync.FileRecord;
-import nl.opengeogroep.filesetsync.Protocol;
+import nl.opengeogroep.filesetsync.protocol.Protocol;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
 import nl.opengeogroep.filesetsync.client.util.HttpClientUtil;
 import nl.opengeogroep.filesetsync.util.FormatUtil;
@@ -108,7 +108,7 @@ public class FilesetSyncer {
         try(CloseableHttpClient httpClient = HttpClientUtil.get()) {
             HttpGet get = new HttpGet(serverUrl + "list/" + fs.getRemote());
             if(cachedFileList) {
-                get.addHeader(HttpHeaders.IF_MODIFIED_SINCE, HttpUtil.format(state.getFileListDate()));
+                get.addHeader(HttpHeaders.IF_MODIFIED_SINCE, HttpUtil.formatDate(state.getFileListDate()));
             }
             // Request poorly encoded text format
             get.addHeader(HttpHeaders.ACCEPT, "text/plain");

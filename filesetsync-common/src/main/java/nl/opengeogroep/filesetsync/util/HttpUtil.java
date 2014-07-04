@@ -2,6 +2,7 @@
 package nl.opengeogroep.filesetsync.util;
 
 import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -18,8 +19,12 @@ public class HttpUtil {
     static {
         format.setTimeZone(TimeZone.getTimeZone("GMT"));
     }
-    
-    public static String format(Date date) {
+
+    public static String formatDate(Date date) {
         return format.format(date);
+    }
+
+    public static Date parseDate(String dateString) throws ParseException {
+        return format.parse(dateString);
     }
 }

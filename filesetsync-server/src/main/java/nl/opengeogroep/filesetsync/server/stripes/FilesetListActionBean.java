@@ -35,8 +35,8 @@ import net.sourceforge.stripes.controller.LifecycleStage;
 import nl.opengeogroep.filesetsync.FileRecord;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_FILE;
-import nl.opengeogroep.filesetsync.Protocol;
-import static nl.opengeogroep.filesetsync.Protocol.FILELIST_ENCODING;
+import nl.opengeogroep.filesetsync.protocol.BufferedFileRecordEncoder;
+import static nl.opengeogroep.filesetsync.protocol.Protocol.FILELIST_ENCODING;
 import nl.opengeogroep.filesetsync.server.FileHashCache;
 import nl.opengeogroep.filesetsync.server.ServerFileset;
 import static nl.opengeogroep.filesetsync.util.FormatUtil.dateToString;
@@ -104,7 +104,7 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
                 out = response.getOutputStream();
             }
 
-            final Protocol.BufferedFileRecordEncoder encoder = new Protocol.BufferedFileRecordEncoder(out);
+            final BufferedFileRecordEncoder encoder = new BufferedFileRecordEncoder(out);
 
             MutableLong hashBytes = new MutableLong();
             MutableLong hashTime = new MutableLong();
