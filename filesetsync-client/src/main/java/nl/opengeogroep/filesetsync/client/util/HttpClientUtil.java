@@ -17,33 +17,18 @@
 
 package nl.opengeogroep.filesetsync.client.util;
 
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-import java.util.TimeZone;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.protocol.HttpDateGenerator;
 
 /**
  *
  * @author Matthijs Laan
  */
 public class HttpClientUtil {
-    private static final DateFormat format = new SimpleDateFormat(HttpDateGenerator.PATTERN_RFC1123, Locale.US);
-    
-    static {
-        format.setTimeZone(TimeZone.getTimeZone("GMT"));
-    }
-    
+
     public static CloseableHttpClient get() {
         return HttpClients.custom()
                 .setUserAgent(Version.getProperty("project.name") + "/" + Version.getProperty("project.version"))
                 .build();
-    }
-    
-    public static String format(Date date) {
-        return format.format(date);
     }
 }

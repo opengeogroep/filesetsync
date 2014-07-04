@@ -14,9 +14,15 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import nl.opengeogroep.filesetsync.util.HttpUtil;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.logging.Log;
+import org.apache.http.HttpHeaders;
+import org.apache.http.HttpStatus;
+import org.apache.http.entity.ContentType;
 
 /**
  *
@@ -25,9 +31,13 @@ import org.apache.commons.logging.Log;
 public class Protocol {
 
     public static final String FILELIST_ENCODING = "UTF-8";
-
     public static final String FILELIST_MIME_TYPE = "application/x-filesetsync-filelist";
+    private static final String FILELIST_HEADER_START = "filesetsync:filelist:start";
+    private static final String FILELIST_HEADER_END = "filesetsync:filelist:end";
+
     public static final String MULTIFILE_MIME_TYPE = "application/x-filesetsync-multifile";
+    private static final String CONTENT_TYPE_DIRECTORY = "application/x-filesetsync-directory";
+    private static final String HEADER_FILENAME = "X-Filesetsync-Filename";
 
     public static List<FileRecord> decodeFilelist(InputStream in) throws IOException {
         // Poorly-encoded text decoding
@@ -35,11 +45,11 @@ public class Protocol {
         List<FileRecord> l = new ArrayList();
         BufferedReader br = new BufferedReader(new InputStreamReader(in, FILELIST_ENCODING));
         String line = br.readLine();
-        if(line == null || !"filesetsync:filelist".equals(line)) {
+        if(line == null || !FILELIST_HEADER_START.equals(line)) {
             throw new IOException("Wrong filelist format returned, bad server URL? Output: " + line);
         }
         while((line = br.readLine()) != null) {
-            if("filesetsync:filelist:end".equals(line)) {
+            if(FILELIST_HEADER_END.equals(line)) {
                 return l;
             }
             String[] s = line.split("\\|");
@@ -69,7 +79,7 @@ public class Protocol {
 
         public void write(FileRecord f) throws IOException {
             if(!headerWritten) {
-                writer.append("filesetsync:filelist\n");
+                writer.append(FILELIST_HEADER_START + "\n");
                 headerWritten = true;
             }
 
@@ -89,15 +99,13 @@ public class Protocol {
 
         @Override
         public void close() throws IOException {
-            writer.append("filesetsync:filelist:end\n");
+            writer.append(FILELIST_HEADER_END + "\n");
             writer.close();
         }
     }
 
     public static class MultiFileEncoder implements AutoCloseable {
         final private DataOutputStream out;
-
-        boolean headerWritten = false;
 
         final Log log;
 
@@ -106,48 +114,111 @@ public class Protocol {
             this.log = log;
         }
 
-        public void write(FileRecord f) throws IOException {
-            if(!headerWritten) {
-                out.writeUTF("filesetsync:multifile:start");
-                headerWritten = true;
+        private class MultiFileResponseHeaderWriter {
+            public MultiFileResponseHeaderWriter(int status, String statusLine, String filename) throws IOException {
+                out.writeInt(status);
+                out.writeUTF(statusLine);
+                if(filename != null) {
+                    out.writeUTF(HEADER_FILENAME);
+                    out.writeUTF(filename);
+                }
             }
-            out.writeUTF(f.getName());
+
+            public MultiFileResponseHeaderWriter contentType(String contentType) throws IOException {
+                out.writeUTF(HttpHeaders.CONTENT_TYPE);
+                out.writeUTF(contentType);
+                return this;
+            }
+
+            public MultiFileResponseHeaderWriter contentLength(long length) throws IOException {
+                out.writeUTF(HttpHeaders.CONTENT_LENGTH);
+                out.writeUTF(length + "");
+                return this;
+            }
+
+            public MultiFileResponseHeaderWriter lastModified(long lastModified) throws IOException {
+                out.writeUTF(HttpHeaders.LAST_MODIFIED);
+                out.writeUTF(HttpUtil.format(new Date(lastModified)));
+                return this;
+            }
+
+            public void write() throws IOException {
+                out.writeUTF("\n");
+            }
+        }
+
+        public void write(FileRecord f) throws IOException {
+
             if(f.getFile() == null) {
-                out.writeBoolean(false);
+                new MultiFileResponseHeaderWriter(HttpStatus.SC_NOT_FOUND, "Not Found", f.getName())
+                        .contentLength(0)
+                        .write();
             } else {
                 char type = FileRecord.typeOf(f.getFile());
                 if(type == FileRecord.TYPE_DIRECTORY) {
-                    out.writeBoolean(true);
-                    out.writeChar(type);
-                    out.writeLong(f.getFile().lastModified());
+
+                    try {
+                        long lastModified = f.getFile().lastModified();
+
+                        new MultiFileResponseHeaderWriter(HttpStatus.SC_OK, "OK", f.getName())
+                                .contentLength(0)
+                                .contentType(CONTENT_TYPE_DIRECTORY)
+                                .lastModified(lastModified)
+                                .write();
+                    } catch(IOException e) {
+                        log.error("can't read last modified date of directory " + f.getFile() + ": " + ExceptionUtils.getMessage(e));
+                        new MultiFileResponseHeaderWriter(HttpStatus.SC_INTERNAL_SERVER_ERROR, "Internal Server Error (can't read last modified date)", f.getName())
+                                .contentLength(0)
+                                .write();
+                    }
                 } else if(type == FileRecord.TYPE_FILE) {
                     FileInputStream fis;
+                    long lastModified;
+                    long length;
                     try {
+                        lastModified = f.getFile().lastModified();
+                        length = f.getFile().length();
                         fis = new FileInputStream(f.getFile());
                     } catch(FileNotFoundException e) {
                         log.error("file not found: " + f.getFile());
-                        out.writeBoolean(false);
+                        new MultiFileResponseHeaderWriter(HttpStatus.SC_NOT_FOUND, "Not Found", f.getName())
+                                .contentLength(0)
+                                .write();
                         return;
                     }
-                    out.writeBoolean(true);
-                    out.writeChar(type);
-                    out.writeLong(f.getFile().lastModified());
-                    out.writeLong(f.getFile().length());
+
+                    new MultiFileResponseHeaderWriter(HttpStatus.SC_OK, "OK", f.getName())
+                            .contentType(ContentType.APPLICATION_OCTET_STREAM.getMimeType())
+                            .lastModified(lastModified)
+                            .contentLength(length)
+                            .write();
 
                     // XXX input stream could have less or more bytes than length
-                    // use chunked encoding
-                    IOUtils.copy(fis, out);
-                    fis.close();
+                    // if file was changed after reading length, use chunked encoding
+
+                    try {
+                        IOUtils.copy(fis, out);
+                        fis.close();
+                    } catch(Throwable e) {
+                        log.error("exception writing file " + f.getFile().getName() + ", aborting", e);
+                        // IO Exceptions reading file lead to aborted response, client
+                        // can't recover and read next file without chuncked encoding
+                        throw e;
+                    }
                 } else {
                     log.error("cannot encode file that is not a file or directory: " + f.getFile());
-                    out.writeBoolean(false);
+                    new MultiFileResponseHeaderWriter(HttpStatus.SC_INTERNAL_SERVER_ERROR, "Internal Server Error (not a file or directory)", f.getName())
+                            .contentLength(0)
+                            .write();
                 }
             }
         }
 
         @Override
         public void close() throws IOException {
-            out.writeUTF("filesetsync:multifile:end");
+            new MultiFileResponseHeaderWriter(HttpStatus.SC_NO_CONTENT, "No more content", null)
+                    .contentLength(0)
+                    .write();
             out.close();
         }
     }
