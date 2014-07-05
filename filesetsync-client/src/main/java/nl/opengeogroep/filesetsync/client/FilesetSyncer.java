@@ -68,13 +68,13 @@ public class FilesetSyncer {
     private String serverUrl;
 
     List<FileRecord> fileList;
-    
+
     long totalBytes;
 
     String localCanonicalPath;
-    
+
     final private List<Pair<File,Long>> directoriesLastModifiedTimes = new ArrayList();
-    
+
     public FilesetSyncer(Fileset fs) throws IOException {
         this.fs = fs;
         localCanonicalPath = new File(fs.getLocal()).getCanonicalPath();
@@ -253,15 +253,15 @@ public class FilesetSyncer {
             log.info("Request: " + post.getRequestLine());
             try(CloseableHttpResponse response = httpClient.execute(post)) {
                 log.info("Response: " + response.getStatusLine());
-                
+
                 int status = response.getStatusLine().getStatusCode();
                 if(status < 200 || status >= 300) {
-                    throw new IOException(String.format("Server returned \"%s\" for request \"%s\", body: %s", 
-                            response.getStatusLine(), 
-                            post.getRequestLine(), 
+                    throw new IOException(String.format("Server returned \"%s\" for request \"%s\", body: %s",
+                            response.getStatusLine(),
+                            post.getRequestLine(),
                             EntityUtils.toString(response.getEntity())));
                 }
-                
+
                 try(MultiFileDecoder decoder = new MultiFileDecoder(response.getEntity().getContent())) {
                     int i = 0;
                     for(MultiFileHeader mfh: decoder) {
@@ -282,7 +282,7 @@ public class FilesetSyncer {
                                 throw new IOException("Server returned invalid filename: " + mfh.getFilename());
                             }
                         }
-                        
+
                         if(mfh.isDirectory()) {
                             log.info("Creating directory " + local.getName());
                             local.mkdirs();
