@@ -275,6 +275,11 @@ public class FilesetSyncer {
                         if(mfh.isDirectory()) {
                             log.info("Creating directory " + local.getName());
                             local.mkdirs();
+                            try {
+                                local.setLastModified(mfh.getLastModified().getTime());
+                            } catch(Exception e) {
+                                log.warn("Exception setting last modified time of " + local.getName() + ": " + ExceptionUtils.getMessage(e));
+                            }                            
                             continue;
                         }
 
