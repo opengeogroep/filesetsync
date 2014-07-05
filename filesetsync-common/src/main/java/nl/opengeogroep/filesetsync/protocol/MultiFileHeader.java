@@ -8,6 +8,8 @@ import java.text.ParseException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import static nl.opengeogroep.filesetsync.protocol.MultiFileEncoder.CONTENT_TYPE_DIRECTORY;
 import static nl.opengeogroep.filesetsync.protocol.MultiFileEncoder.HEADER_FILENAME;
 import nl.opengeogroep.filesetsync.util.HttpUtil;
@@ -53,9 +55,13 @@ public class MultiFileHeader {
         return headers.get(HttpHeaders.CONTENT_TYPE);
     }
 
-    public Date getLastModified() throws ParseException {
+    public Date getLastModified() {
         String s = headers.get(HttpHeaders.LAST_MODIFIED);
-        return HttpUtil.parseDate(s);
+        try {
+            return HttpUtil.parseDate(s);
+        } catch (ParseException ex) {
+            return new Date();
+        }
     }
     
     public String getFilename() {

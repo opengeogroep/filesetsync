@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import nl.opengeogroep.filesetsync.FileRecord;
@@ -37,6 +38,7 @@ import static nl.opengeogroep.filesetsync.util.FormatUtil.*;
 import nl.opengeogroep.filesetsync.util.HttpUtil;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpEntity;
@@ -70,6 +72,8 @@ public class FilesetSyncer {
     long totalBytes;
 
     String localCanonicalPath;
+    
+    final private List<Pair<File,Long>> directoriesLastModifiedTimes = new ArrayList();
     
     public FilesetSyncer(Fileset fs) throws IOException {
         this.fs = fs;
@@ -226,6 +230,13 @@ public class FilesetSyncer {
             chunks++;
         } while(endIndex < fileList.size()-1);
 
+        if(!directoriesLastModifiedTimes.isEmpty()) {
+            log.info(String.format("Setting last modified times of %d directories...", directoriesLastModifiedTimes.size()));
+            for(Pair<File,Long> dlm: directoriesLastModifiedTimes) {
+                dlm.getLeft().setLastModified(dlm.getRight());
+            }
+        }
+
         log.info(String.format("transfer complete, %d chunks, %d KB total", chunks, totalBytes/1024));
     }
 
@@ -275,11 +286,7 @@ public class FilesetSyncer {
                         if(mfh.isDirectory()) {
                             log.info("Creating directory " + local.getName());
                             local.mkdirs();
-                            try {
-                                local.setLastModified(mfh.getLastModified().getTime());
-                            } catch(Exception e) {
-                                log.warn("Exception setting last modified time of " + local.getName() + ": " + ExceptionUtils.getMessage(e));
-                            }                            
+                            directoriesLastModifiedTimes.add(Pair.of(local, mfh.getLastModified().getTime()));
                             continue;
                         }
 
@@ -295,11 +302,7 @@ public class FilesetSyncer {
                             log.error(String.format("Error writing to local file \"%s\": %s", fs.getLocal(), ExceptionUtils.getMessage(e)));
                             throw e;
                         }
-                        try {
-                            local.setLastModified(mfh.getLastModified().getTime());
-                        } catch(Exception e) {
-                            log.warn("Exception setting last modified time of " + local.getName() + ": " + ExceptionUtils.getMessage(e));
-                        }
+                        local.setLastModified(mfh.getLastModified().getTime());
                     }
                 }
             }
