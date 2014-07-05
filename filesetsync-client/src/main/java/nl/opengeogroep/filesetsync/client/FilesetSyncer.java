@@ -23,9 +23,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import nl.opengeogroep.filesetsync.FileRecord;
+import nl.opengeogroep.filesetsync.FileRecordListDirectoryIterator;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import nl.opengeogroep.filesetsync.client.util.HttpClientUtil;
@@ -98,6 +101,9 @@ public class FilesetSyncer {
 
         try {
             retrieveFilesetList();
+            if(fs.isDelete()) {
+                deleteLocalFiles();
+            }
             compareFilesetList();
             transferFiles();
 
@@ -186,6 +192,49 @@ public class FilesetSyncer {
         }
     }
 
+    private void deleteLocalFiles() {
+        for(List<FileRecord> dirList: new FileRecordListDirectoryIterator(fileList)) {
+            Iterator<FileRecord> it = dirList.iterator();
+            FileRecord dir = it.next();
+            File localDir = new File(fs.getLocal() + File.separator + dir.getName());
+
+            if(!localDir.exists()) {
+                continue;
+            }
+
+            List<String> toDelete = new ArrayList(Arrays.asList(localDir.list()));
+
+            while(it.hasNext()) {
+                FileRecord fr = it.next();
+                String name = dir.getName().equals(".") ? fr.getName() : fr.getName().substring(dir.getName().length()+1);
+                if(toDelete.indexOf(name) != -1) {
+                    // Don't delete this file -- may need to be overwritten though
+
+                    try {
+                        // But if is not the same type, do delete it
+                        char localType = new File(localDir.getCanonicalPath() + File.separator + name).isDirectory()
+                                    ? 'd'
+                                    : 'f';
+                        if(localType == fr.getType()) {
+                            toDelete.remove(name);
+                        }
+                    } catch (IOException ex) {
+                    }
+                }
+            }
+
+            for(String deleteIt: toDelete) {
+                File f = new File(localDir + File.separator + deleteIt);
+                try {
+                    log.info("delete    " + f.getCanonicalPath());
+                    f.delete();
+                } catch(Exception e) {
+                    log.error("Exception deleting file " + f + ": " + ExceptionUtils.getMessage(e));
+                }
+            }
+        }
+    }
+
     private void compareFilesetList() {
         // TODO
     }
@@ -265,7 +314,7 @@ public class FilesetSyncer {
                 try(MultiFileDecoder decoder = new MultiFileDecoder(response.getEntity().getContent())) {
                     int i = 0;
                     for(MultiFileHeader mfh: decoder) {
-                        log.info(String.format("File #%3d: %8d bytes, %s, %s", ++i, mfh.getContentLength(), mfh.getContentType(), mfh.getFilename()));
+                        log.trace(String.format("File #%3d: %8d bytes, %s, %s", ++i, mfh.getContentLength(), mfh.getContentType(), mfh.getFilename()));
                         File local;
                         if(mfh.getFilename().equals(".")) {
                             if(mfh.isDirectory()) {
@@ -284,16 +333,19 @@ public class FilesetSyncer {
                         }
 
                         if(mfh.isDirectory()) {
-                            log.info("Creating directory " + local.getName());
+                            if(local.exists() && local.isDirectory()) {
+                                continue;
+                            }
+                            log.info("mkdir     " + mfh.getFilename());
                             local.mkdirs();
                             directoriesLastModifiedTimes.add(Pair.of(local, mfh.getLastModified().getTime()));
                             continue;
                         }
 
                         if(local.exists()) {
-                            log.info("Overwriting local file " + local.getName());
+                            log.info("overwrite " + mfh.getFilename());
                         } else {
-                            log.info("Writing new file " + local.getName());
+                            log.info("write     " + mfh.getFilename());
                         }
                         try(FileOutputStream out = new FileOutputStream(local)) {
                             IOUtils.copy(mfh.getBody(), out);
