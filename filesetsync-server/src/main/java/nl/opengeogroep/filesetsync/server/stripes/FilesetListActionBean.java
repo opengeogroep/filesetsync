@@ -33,6 +33,7 @@ import net.sourceforge.stripes.action.StreamingResolution;
 import net.sourceforge.stripes.action.StrictBinding;
 import net.sourceforge.stripes.action.UrlBinding;
 import net.sourceforge.stripes.controller.LifecycleStage;
+import net.sourceforge.stripes.validation.Validate;
 import nl.opengeogroep.filesetsync.FileRecord;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_FILE;
@@ -57,6 +58,9 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
 
     private static final Log log = LogFactory.getLog("api.list");
 
+    @Validate
+    private boolean hash = false;
+
     @Override
     protected final String getLogName() {
         return "api.list";
@@ -72,6 +76,14 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
     @Override
     public void setContext(ActionBeanContext context) {
         this.context = context;
+    }
+
+    public boolean isHash() {
+        return hash;
+    }
+
+    public void setHash(boolean hash) {
+        this.hash = hash;
     }
 
     private class FilesetListingResolution extends StreamingResolution {
@@ -116,7 +128,9 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
                 }
                 if(TYPE_FILE == fr.getType()) {
                     try {
-                        fr.setHash(FileHashCache.getCachedFileHash(fileset, fr.getFile(), fr.getLastModified(), hashBytes, hashTime));
+                        if(hash) {
+                            fr.setHash(FileHashCache.getCachedFileHash(fileset, fr.getFile(), fr.getLastModified(), hashBytes, hashTime));
+                        }
                         files++;
                         totalBytes += fr.getSize();
                         encoder.write(fr);
@@ -134,13 +148,21 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
             encoder.close();
             out.close();
 
-            log.info(String.format("returned %d directories and %d files, total size %d KB, time %s, hashed %d KB (cache hit rate %.1f%%), hash time %s, hash speed %s",
+            String hashInfo;
+            if(hash) {
+                hashInfo = String.format("hashed %d KB (cache hit rate %.1f%%)",
+                        hashBytes.getValue() / 1024,
+                        Math.abs(100-(100.0/totalBytes*hashBytes.getValue())));
+            } else {
+                hashInfo = "no hashing";
+            }
+
+            log.info(String.format("returned %d directories and %d files, total size %d KB, time %s, %s, hash time %s, hash speed %s",
                     dirs,
                     files,
                     totalBytes / 1024,
                     DurationFormatUtils.formatDurationWords(System.currentTimeMillis() - startTime, true, false),
-                    hashBytes.getValue() / 1024,
-                    Math.abs(100-(100.0/totalBytes*hashBytes.getValue())),
+                    hashInfo,
                     DurationFormatUtils.formatDurationWords(hashTime.getValue(), true, false),
                     (hashTime.getValue() < 100 ? "" : Math.round(hashBytes.getValue() / 1024.0 / (hashTime.getValue() / 1000.0)) + " KB/s")
             ));
@@ -176,13 +198,13 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
             Collection<FileRecord> fileRecords = new ArrayList();
 
             String cacheDir = new File(FileHashCache.getCacheDir(theFileset.getName())).getCanonicalPath();
-            
+
             log.trace("begin directory traversal for conditional http request from " + getLocalSubPath());
             long startTime = System.currentTimeMillis();
             for(FileRecord fr: FileRecord.getFileRecordsInDir(getLocalSubPath())) {
                 if(fr.getFile().getCanonicalPath().startsWith(cacheDir)) {
                     continue;
-                }                
+                }
                 fileRecords.add(fr);
                 lastModified = Math.max(lastModified, fr.getLastModified());
             }
