@@ -107,13 +107,11 @@ public class FileRecordListDirectoryIterator implements Iterable<List<FileRecord
         next.add(dirRecord);
 
         String currentDirName = dirRecord.getName();
-        System.out.println("Current directory: " + dirRecord);
         for(index++; index < list.size(); index++) {
             FileRecord fr = list.get(index);
 
             // Is record in current directory?
             if(startIndex != 0 && !fr.getName().startsWith(currentDirName)) {
-                System.out.println("Went outside current directory: " + fr.getName());
                 break;
             }
 
@@ -127,12 +125,7 @@ public class FileRecordListDirectoryIterator implements Iterable<List<FileRecord
                 if(fr.getType() == TYPE_DIRECTORY) {
                     // breadth-first
                     deque.addLast(index);
-                    System.out.println("Added direct subdirectory to next list and deque: " + dequeToString());
-                } else {
-                    System.out.println("Added file: " + fr.getName());
                 }
-            } else {
-                System.out.println("Skipping non-direct file/directory: " + fr.getName());
             }
         }
         return true;
