@@ -5,10 +5,12 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.text.MessageFormat;
+import java.util.Properties;
 import static javax.swing.JOptionPane.ERROR_MESSAGE;
 import static javax.swing.JOptionPane.showMessageDialog;
 import javax.swing.UIManager;
 import javax.xml.bind.JAXBException;
+import nl.opengeogroep.filesetsync.client.config.Property;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import nl.opengeogroep.filesetsync.client.util.L10n;
 import nl.opengeogroep.filesetsync.client.util.Version;
@@ -27,14 +29,6 @@ public final class Main {
                 UIManager.getSystemLookAndFeelClassName());
         } catch(Exception e) {
         }
-
-        log.info(String.format("%s %s starting",
-                Version.getProperty("project.name"),
-                Version.getProjectVersion()));
-
-        StringWriter sw = new StringWriter();
-        Version.getProperties().list(new PrintWriter(sw));
-        log.info(sw.toString());
 
         String path, configFile;
 
@@ -85,6 +79,22 @@ public final class Main {
                     message));
             System.exit(1);
         }
+
+        Properties props = new Properties();
+        for(Property p: SyncConfig.getInstance().getProperties()) {
+            if(p.getValue() != null) {
+                props.setProperty(p.getName(), p.getValue().replace("${var}", SyncConfig.getInstance().getVarDir()));
+            }
+        }
+        org.apache.log4j.PropertyConfigurator.configure(props);
+
+        log.info(String.format("%s %s starting",
+                Version.getProperty("project.name"),
+                Version.getProjectVersion()));
+
+        StringWriter sw = new StringWriter();
+        Version.getProperties().list(new PrintWriter(sw));
+        log.info(sw.toString());
 
         log.info(SyncConfig.getInstance());
 
