@@ -1,0 +1,10 @@
+filesetsync:filelist:start
+d|.|0|0|null
+f|file1|0|0|null
+d|dir1|0|0|null
+d|dir1/subdir|0|0|null
+f|dir1/file2|0|0|null
+f|file2|0|0|null
+d|dir2|0|0|null
+f|dir2/file3|0|0|null
+filesetsync:filelist:end
