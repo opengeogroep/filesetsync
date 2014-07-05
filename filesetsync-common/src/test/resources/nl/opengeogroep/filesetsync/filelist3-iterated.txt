@@ -1,0 +1,9 @@
+d|.,f|file1,d|dir1,f|dir1suspiciouslynamedfile,f|file2,d|dir2,
+#
+d|dir1,d|dir1/subdir,f|dir1/file2,
+#
+d|dir2,f|dir2/file3,
+#
+d|dir1/subdir,
+#
+

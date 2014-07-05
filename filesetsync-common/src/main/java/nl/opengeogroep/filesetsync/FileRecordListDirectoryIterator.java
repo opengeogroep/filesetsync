@@ -50,11 +50,11 @@ import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
  * <pre>
  * add  d .
  * add  f file1
- * add  d dir1, add index to deque, skip all following entries starting with dir1
+ * add  d dir1, add index to deque, skip all following entries starting with dir1/
  * skip d dir1/subdir
  * skip f dir1/file2
  * add  f file2
- * add  d dir2, add index to deque, skip all following entries starting with dir2
+ * add  d dir2, add index to deque, skip all following entries starting with dir2/
  * skip f dir2/file3
  * </pre>
  * The hasNext() method returns true until the deque is empty. For the next
@@ -62,9 +62,9 @@ import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
  * index popped from the deque:
  * <pre>
  * add     d dir1
- * add     d dir1/subdir, add index to deque, skip all following entries starting with dir1/subdir
+ * add     d dir1/subdir, add index to deque, skip all following entries starting with dir1/subdir/
  * add     f dir1/file2
- * stop at f file2, because it did not start with dir1
+ * stop at f file2, because it did not start with dir1/
  * </pre>
  * <p>
  * @author Matthijs Laan <matthijslaan@b3partners.nl>
@@ -111,7 +111,7 @@ public class FileRecordListDirectoryIterator implements Iterable<List<FileRecord
             FileRecord fr = list.get(index);
 
             // Is record in current directory?
-            if(startIndex != 0 && !fr.getName().startsWith(currentDirName)) {
+            if(startIndex != 0 && !fr.getName().startsWith(currentDirName + "/")) {
                 break;
             }
 

@@ -20,8 +20,8 @@ import org.junit.Before;
  */
 public class FileRecordListDirectoryIteratorTest {
 
-    private final List<FileRecord>[] filelists = new List[2];
-    private final String[] expOutputs = new String[2];
+    private final List<FileRecord>[] filelists = new List[3];
+    private final String[] expOutputs = new String[3];
 
 
     public FileRecordListDirectoryIteratorTest() {
@@ -34,6 +34,8 @@ public class FileRecordListDirectoryIteratorTest {
         expOutputs[0] = IOUtils.toString(getClass().getResourceAsStream("filelist1-iterated.txt")).replaceAll("\n", "");
         filelists[1] = Protocol.decodeFilelist(getClass().getResourceAsStream("filelist2.txt"));
         expOutputs[1] = IOUtils.toString(getClass().getResourceAsStream("filelist2-iterated.txt")).replaceAll("\n", "");
+        filelists[2] = Protocol.decodeFilelist(getClass().getResourceAsStream("filelist3.txt"));
+        expOutputs[2] = IOUtils.toString(getClass().getResourceAsStream("filelist3-iterated.txt")).replaceAll("\n", "");
     }
 
     private String output(FileRecordListDirectoryIterator it) {
@@ -63,5 +65,15 @@ public class FileRecordListDirectoryIteratorTest {
         String output = output(it);
 
         assertEquals(expOutputs[1], output);
+    }
+
+
+    @org.junit.Test
+    public void testFilelist3() {
+
+        FileRecordListDirectoryIterator it = new FileRecordListDirectoryIterator(filelists[2]);
+        String output = output(it);
+
+        assertEquals(expOutputs[2], output);
     }
 }
