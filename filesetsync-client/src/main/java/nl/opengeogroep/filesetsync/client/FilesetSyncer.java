@@ -25,9 +25,13 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import nl.opengeogroep.filesetsync.FileRecord;
+import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
+import static nl.opengeogroep.filesetsync.FileRecord.TYPE_FILE;
 import nl.opengeogroep.filesetsync.FileRecordListDirectoryIterator;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
@@ -39,8 +43,11 @@ import nl.opengeogroep.filesetsync.protocol.Protocol;
 import nl.opengeogroep.filesetsync.util.FormatUtil;
 import static nl.opengeogroep.filesetsync.util.FormatUtil.*;
 import nl.opengeogroep.filesetsync.util.HttpUtil;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.commons.lang3.mutable.MutableLong;
+import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -51,8 +58,9 @@ import static org.apache.http.HttpStatus.*;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
@@ -77,6 +85,8 @@ public class FilesetSyncer {
     String localCanonicalPath;
 
     final private List<Pair<File,Long>> directoriesLastModifiedTimes = new ArrayList();
+
+    final private Map<String,String> localFilesByHash = new HashMap();
 
     public FilesetSyncer(Fileset fs) throws IOException {
         this.fs = fs;
@@ -106,6 +116,7 @@ public class FilesetSyncer {
             }
             compareFilesetList();
             transferFiles();
+            setDirectoriesLastModified();
 
             log.info("Sync job complete");
             state.endRun(true);
@@ -135,7 +146,10 @@ public class FilesetSyncer {
         action(s);
 
         try(CloseableHttpClient httpClient = HttpClientUtil.get()) {
-            HttpGet get = new HttpGet(serverUrl + "list/" + fs.getRemote());
+            HttpUriRequest get = RequestBuilder.get()
+                    .setUri(serverUrl + "list/" + fs.getRemote())
+                    .addParameter("hash", fs.isHash() + "")
+                    .build();
             if(cachedFileList) {
                 get.addHeader(HttpHeaders.IF_MODIFIED_SINCE, HttpUtil.formatDate(state.getFileListDate()));
             }
@@ -226,8 +240,13 @@ public class FilesetSyncer {
             for(String deleteIt: toDelete) {
                 File f = new File(localDir + File.separator + deleteIt);
                 try {
-                    log.info("delete    " + f.getCanonicalPath());
-                    f.delete();
+                    if(f.isDirectory()) {
+                        log.info("rmdirs    " + f.getCanonicalPath());
+                        FileUtils.deleteDirectory(f);
+                    } else {
+                        log.info("delete    " + f.getCanonicalPath());
+                        f.delete();
+                    }
                 } catch(Exception e) {
                     log.error("Exception deleting file " + f + ": " + ExceptionUtils.getMessage(e));
                 }
@@ -235,17 +254,87 @@ public class FilesetSyncer {
         }
     }
 
-    private void compareFilesetList() {
-        // TODO
+    /**
+     * Removes files which are locally up-to-date from the list of files to
+     * transfer. Updates lastModified date.
+     */
+    private void compareFilesetList() throws IOException {
+
+        List<FileRecord> alreadyLocal = new ArrayList();
+
+        MutableLong hashTime = new MutableLong();
+        long hashBytes = 0;
+        long startTime = System.currentTimeMillis();
+
+        for(FileRecord fr: fileList) {
+            File localFile = new File(fs.getLocal() + File.separator + fr.getName());
+            if(fr.getType() == TYPE_DIRECTORY && localFile.exists()) {
+                if(!localFile.isDirectory()) {
+                    log.error("Local file in is the way for remote directory: " + localFile.getCanonicalPath());
+                }
+                if(fr.getLastModified() != localFile.lastModified()) {
+                    log.info(String.format("Later updating last modified for directory %s", localFile.getCanonicalPath()));
+                    directoriesLastModifiedTimes.add(Pair.of(localFile, fr.getLastModified()));
+                }
+                alreadyLocal.add(fr);
+            }
+            if(fr.getType() == TYPE_FILE && localFile.exists()) {
+                if(!localFile.isFile()) {
+                    log.error("Local non-file is in the way for remote file: " + localFile.getCanonicalPath());
+                }
+                if(fs.isHash()) {
+                    try {
+                        String hash = FileRecord.calculateHash(localFile, hashTime);
+                        localFilesByHash.put(hash, localFile.getCanonicalPath());
+                        hashBytes += localFile.length();
+                        if(hash.equals(fr.getHash())) {
+                            log.trace("Same hash for " + fr.getName());
+                            alreadyLocal.add(fr);
+                        } else {
+                            log.info("Hash mismatch for " + fr.getName());
+                        }
+                    } catch(Exception e) {
+                        log.error("Error hashing " + localFile.getCanonicalPath() + ": " + ExceptionUtils.getMessage(e));
+                    }
+                } else {
+                    if(fr.getLastModified() > localFile.lastModified()) {
+                        log.debug("Remote file newer: " + fr.getName());
+                    } else if(fr.getLastModified() < localFile.lastModified()) {
+                        log.warn(String.format("Keeping local file last modified at %s, later than remote file at %s: ", dateToString(new Date(localFile.lastModified())), dateToString(new Date(fr.getLastModified())), fr.getName()));
+                        alreadyLocal.add(fr);
+                    } else {
+                        log.trace("Local file unmodified: " + fr.getName());
+                        alreadyLocal.add(fr);
+                    }
+                }
+            }
+        }
+
+        // TODO: if file in file list already in localFilesByHash OR, remove them
+        // Also remove duplicate hashes in fileList
+
+        String hashInfo;
+        if(fs.isHash()) {
+            hashInfo = String.format(", hashed hashed %d KB, hash speed %s",
+                    hashBytes / 1024,
+                    (hashTime.getValue() < 100 ? "n/a" : Math.round(hashBytes / 1024.0 / (hashTime.getValue() / 1000.0)) + " KB/s"));
+        } else {
+            hashInfo = "";
+        }
+        log.info(String.format("Compared file list to local files in %s, %d files up-to-date%s",
+                DurationFormatUtils.formatDurationWords(System.currentTimeMillis() - startTime, true, false),
+                alreadyLocal.size(),
+                hashInfo));
+        fileList.removeAll(alreadyLocal);
     }
 
     private void transferFiles() throws IOException {
         if(fileList.isEmpty()) {
-            log.info("no files to transfer");
+            log.info("No files to transfer");
             return;
         }
 
-        action(String.format("transferring %d files", fileList.size()));
+        action(String.format("Transferring %d files", fileList.size()));
 
         // A "chunk" here means a set of multiple files not smaller than the
         // configured chunk size (unless there are no more files)
@@ -267,7 +356,7 @@ public class FilesetSyncer {
                 }
             }
             List<FileRecord> chunkList = fileList.subList(index, endIndex+1);
-            log.info(String.format("requesting chunk of %d files (size %d KB)", chunkList.size(), thisChunkSize));
+            log.info(String.format("Requesting chunk of %d files (size %d KB)", chunkList.size(), thisChunkSize));
             if(log.isTraceEnabled()) {
                 int t = 0;
                 for(FileRecord fr: chunkList) {
@@ -279,14 +368,16 @@ public class FilesetSyncer {
             chunks++;
         } while(endIndex < fileList.size()-1);
 
+        log.info(String.format("Transfer complete, %d chunks, %d KB total", chunks, totalBytes/1024));
+    }
+
+    private void setDirectoriesLastModified() {
         if(!directoriesLastModifiedTimes.isEmpty()) {
             log.info(String.format("Setting last modified times of %d directories...", directoriesLastModifiedTimes.size()));
             for(Pair<File,Long> dlm: directoriesLastModifiedTimes) {
                 dlm.getLeft().setLastModified(dlm.getRight());
             }
         }
-
-        log.info(String.format("transfer complete, %d chunks, %d KB total", chunks, totalBytes/1024));
     }
 
     private void transferChunk(List<FileRecord> chunkList) throws IOException {

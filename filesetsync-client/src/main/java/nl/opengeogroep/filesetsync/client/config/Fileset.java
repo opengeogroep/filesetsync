@@ -74,6 +74,12 @@ public class Fileset implements Comparable {
     private String direction;
 
     /**
+     * If true, compare files by hash instead of last modified date.
+     */
+    @XmlElement
+    private boolean hash = false;
+
+    /**
      * Delete local files not existing in server file list, default false. When
      * uploading the server may decide to ignore deletes.
      */
@@ -140,6 +146,14 @@ public class Fileset implements Comparable {
 
     public void setDirection(String direction) {
         this.direction = direction;
+    }
+
+    public boolean isHash() {
+        return hash;
+    }
+
+    public void setHash(boolean hash) {
+        this.hash = hash;
     }
 
     public boolean isDelete() {
