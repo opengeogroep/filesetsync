@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Locale;
 import javax.servlet.http.HttpServletResponse;
-import net.sourceforge.stripes.action.ActionBean;
 import net.sourceforge.stripes.action.After;
 import net.sourceforge.stripes.action.Resolution;
 import net.sourceforge.stripes.controller.LifecycleStage;
@@ -37,13 +36,12 @@ import nl.opengeogroep.filesetsync.server.ServerFileset;
 import nl.opengeogroep.filesetsync.server.ServerSyncConfig;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.log4j.MDC;
 
 /**
  *
  * @author Matthijs Laan
  */
-public abstract class FilesetBaseActionBean implements ActionBean, ValidationErrorHandler {
+public abstract class FilesetBaseActionBean extends RequestLoggerActionBean implements ValidationErrorHandler {
     private final Log log = LogFactory.getLog(getLogName());
 
     private String filesetName;
@@ -54,8 +52,6 @@ public abstract class FilesetBaseActionBean implements ActionBean, ValidationErr
     private String filesetPath;
 
     private ServerFileset fileset;
-
-    protected abstract String getLogName();
 
     public String getFilesetName() {
         return filesetName;
@@ -114,9 +110,6 @@ public abstract class FilesetBaseActionBean implements ActionBean, ValidationErr
             return;
         }
 
-        MDC.put("fileset", fileset.getName());
-        MDC.put("subPath", getSubPath());
-
         File filesetRoot = new File(fileset.getPath());
         if(!filesetRoot.exists()) {
             log.error("local path does not exist for requested fileset path " + filesetPath + ": " + fileset.getPath());
@@ -169,10 +162,4 @@ public abstract class FilesetBaseActionBean implements ActionBean, ValidationErr
         }
         return new ErrorMessageResolution(HttpServletResponse.SC_NOT_FOUND, message);
     }
-
-    @After(stages = LifecycleStage.RequestComplete)
-    public void clearMDC() {
-        MDC.clear();
-    }
-
 }

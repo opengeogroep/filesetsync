@@ -25,12 +25,10 @@ import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import javax.servlet.http.HttpServletResponse;
-import net.sourceforge.stripes.action.After;
 import net.sourceforge.stripes.action.Resolution;
 import net.sourceforge.stripes.action.StreamingResolution;
 import net.sourceforge.stripes.action.StrictBinding;
 import net.sourceforge.stripes.action.UrlBinding;
-import net.sourceforge.stripes.controller.LifecycleStage;
 import nl.b3p.web.stripes.ErrorMessageResolution;
 import nl.opengeogroep.filesetsync.FileRecord;
 import nl.opengeogroep.filesetsync.protocol.MultiFileEncoder;
@@ -108,7 +106,7 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
                     unacceptableFiles));
             filesToStream = requestedFiles;
         } else {
-            log.info("recursively streaming all files walking from directory " + getLocalSubPath());
+            log.info("recursively streaming " + getLocalSubPath());
             filesToStream = FileRecord.getFileRecordsInDir(getLocalSubPath());
         }
 
@@ -141,35 +139,34 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
             final MultiFileEncoder streamer = new MultiFileEncoder(uncompressedCounter, log);
 
             long startTime = System.currentTimeMillis();
-            for(FileRecord fr: fileRecords) {
-                try {
-                    streamer.write(fr);
-                } catch(Exception e) {
-                    if(e.getClass().getName().endsWith("ClientAbortException")) {
-                        log.warn("received client abort streaming " + fr);
-                    } else {
-                        log.error("exception streaming " + fr, e);
+            try {
+                for(FileRecord fr: fileRecords) {
+                    try {
+                        streamer.write(fr);
+                    } catch(Exception e) {
+                        if(e.getClass().getName().endsWith("ClientAbortException")) {
+                            log.warn("received client abort streaming " + fr);
+                        } else {
+                            log.error("exception streaming " + fr, e);
+                        }
+                        return;
                     }
                 }
+            } finally {
+                streamer.close();
+                uncompressedCounter.close();
+
+                long compressedBytes = compressedCounter.getByteCount();
+                long uncompressedBytes = uncompressedCounter.getByteCount();
+                long duration = System.currentTimeMillis() - startTime;
+                log.info(String.format("streamed %d KB (uncompressed %d KB, ratio %.1f%%) in %s%s",
+                        compressedBytes / 1024,
+                        uncompressedBytes / 1024,
+                        Math.abs(100-(100.0/uncompressedBytes*compressedBytes)),
+                        DurationFormatUtils.formatDurationWords(duration, true, false),
+                        (duration < 100 ? "" : ", " + Math.round(compressedBytes / 1024.0 / (duration / 1000.0)) + " KB/s")
+                ));
             }
-            streamer.close();
-            uncompressedCounter.close();
-            long compressedBytes = compressedCounter.getByteCount();
-            long uncompressedBytes = uncompressedCounter.getByteCount();
-            long duration = System.currentTimeMillis() - startTime;
-            log.info(String.format("streamed %d KB (uncompressed %d KB, ratio %.1f%%) in %s%s",
-                    compressedBytes / 1024,
-                    uncompressedBytes / 1024,
-                    Math.abs(100-(100.0/uncompressedBytes*compressedBytes)),
-                    DurationFormatUtils.formatDurationWords(duration, true, false),
-                    (duration < 100 ? "" : ", " + Math.round(compressedBytes / 1024.0 / (duration / 1000.0)) + " KB/s")
-            ));
-
         }
-    }
-
-    @After(stages = LifecycleStage.ResolutionExecution)
-    public void after() {
-        log.trace("response sent");
     }
 }

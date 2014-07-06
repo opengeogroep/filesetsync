@@ -25,14 +25,11 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.zip.GZIPOutputStream;
 import javax.servlet.http.HttpServletResponse;
-import net.sourceforge.stripes.action.ActionBeanContext;
-import net.sourceforge.stripes.action.After;
 import net.sourceforge.stripes.action.ErrorResolution;
 import net.sourceforge.stripes.action.Resolution;
 import net.sourceforge.stripes.action.StreamingResolution;
 import net.sourceforge.stripes.action.StrictBinding;
 import net.sourceforge.stripes.action.UrlBinding;
-import net.sourceforge.stripes.controller.LifecycleStage;
 import net.sourceforge.stripes.validation.Validate;
 import nl.opengeogroep.filesetsync.FileRecord;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
@@ -64,18 +61,6 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
     @Override
     protected final String getLogName() {
         return "api.list";
-    }
-
-    private ActionBeanContext context;
-
-    @Override
-    public ActionBeanContext getContext() {
-        return context;
-    }
-
-    @Override
-    public void setContext(ActionBeanContext context) {
-        this.context = context;
     }
 
     public boolean isHash() {
@@ -122,51 +107,71 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
             String cacheDir = new File(FileHashCache.getCacheDir(fileset.getName())).getCanonicalPath();
             MutableLong hashBytes = new MutableLong();
             MutableLong hashTime = new MutableLong();
-            for(FileRecord fr: iterable) {
-                if(fr.getFile().getCanonicalPath().startsWith(cacheDir)) {
-                    continue;
-                }
-                if(TYPE_FILE == fr.getType()) {
-                    try {
-                        if(hash) {
-                            fr.setHash(FileHashCache.getCachedFileHash(fileset, fr.getFile(), fr.getLastModified(), hashBytes, hashTime));
-                        }
-                        files++;
-                        totalBytes += fr.getSize();
-                        encoder.write(fr);
-                    } catch(IOException e) {
-                        // TODO ClientAbortException
-                        log.error("Error calculating hash of " + fr.getFile() + ": " + ExceptionUtils.getMessage(e));
+            int hashErrors = 0;
+            try {
+                boolean hashLogMsg = false;
+                for(FileRecord fr: iterable) {
+                    String canonicalPath = fr.getFile().getCanonicalPath();
+                    if(canonicalPath.startsWith(cacheDir)) {
+                        continue;
                     }
-                } else if(TYPE_DIRECTORY == fr.getType()) {
-                    dirs++;
-                    encoder.write(fr);
-                } else {
-                    log.error("Not a file or directory (special or deleted file), ignoring " + fr.getFile());
+                    if(TYPE_FILE == fr.getType()) {
+                        try {
+                            if(hash) {
+                                if(!hashLogMsg) {
+                                    log.debug("start hashing");
+                                    hashLogMsg = true;
+                                }
+                                fr.setHash(FileHashCache.getCachedFileHash(fileset, fr.getFile(), fr.getLastModified(), hashBytes, hashTime));
+                            }
+                            files++;
+                            totalBytes += fr.getSize();
+                            encoder.write(fr);
+                        } catch(IOException e) {
+                            if(e.getClass().getName().endsWith("ClientAbortException")) {
+                                log.warn("received client calculating hash of " + canonicalPath);
+                                return;
+                            } else {
+                                log.error("error calculating hash of " + canonicalPath + ": " + ExceptionUtils.getMessage(e));
+                                if(++hashErrors > 10) {
+                                    // TODO all errors may be from a single unaccessible directory,
+                                    // maybe skip all paths starting with dir part of canonicalPath...
+                                    log.error("too many hash errors, aborting");
+                                    return;
+                                }
+                            }
+                        }
+                    } else if(TYPE_DIRECTORY == fr.getType()) {
+                        dirs++;
+                        encoder.write(fr);
+                    } else {
+                        log.error("not a file or directory (special or deleted file), ignoring " + fr.getFile());
+                    }
                 }
-            }
-            encoder.close();
-            out.close();
+            } finally {
+                encoder.close();
+                out.close();
 
-            String hashInfo;
-            if(hash) {
-                hashInfo = String.format(", hashed %d KB (cache hit rate %.1f%%), hash time %s, hash speed %s",
-                        hashBytes.getValue() / 1024,
-                        Math.abs(100-(100.0/totalBytes*hashBytes.getValue())),
-                        DurationFormatUtils.formatDurationWords(hashTime.getValue(), true, false),
-                        (hashTime.getValue() < 100 ? "n/a" : Math.round(hashBytes.getValue() / 1024.0 / (hashTime.getValue() / 1000.0)) + " KB/s")
-                );
-            } else {
-                hashInfo = " (no hashing)";
-            }
+                String hashInfo;
+                if(hash) {
+                    hashInfo = String.format(", hashed %d KB (cache hit rate %.1f%%), hash time %s, hash speed %s",
+                            hashBytes.getValue() / 1024,
+                            Math.abs(100-(100.0/totalBytes*hashBytes.getValue())),
+                            DurationFormatUtils.formatDurationWords(hashTime.getValue(), true, false),
+                            (hashTime.getValue() < 100 ? "n/a" : Math.round(hashBytes.getValue() / 1024.0 / (hashTime.getValue() / 1000.0)) + " KB/s")
+                    );
+                } else {
+                    hashInfo = " (no hashing)";
+                }
 
-            log.info(String.format("returned %d directories and %d files, total size %d KB, time %s%s",
-                    dirs,
-                    files,
-                    totalBytes / 1024,
-                    DurationFormatUtils.formatDurationWords(System.currentTimeMillis() - startTime, true, false),
-                    hashInfo
-            ));
+                log.info(String.format("listed %d directories and %d files, total size %d KB, time %s%s",
+                        dirs,
+                        files,
+                        totalBytes / 1024,
+                        DurationFormatUtils.formatDurationWords(System.currentTimeMillis() - startTime, true, false),
+                        hashInfo
+                ));
+            }
         }
     }
 
@@ -177,7 +182,7 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
         long ifModifiedSince = getContext().getRequest().getDateHeader("If-Modified-Since");
 
         if(ifModifiedSince == -1) {
-            log.trace("begin directory traversal from " + getLocalSubPath());
+            log.info("listing " + getLocalSubPath());
             // Stream file records directly to output without buffering all
             // records in memory
             // return new FilesetListingResolution(ServerFileset.getFileRecordsInDir(getLocalSubPath());
@@ -200,7 +205,7 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
 
             String cacheDir = new File(FileHashCache.getCacheDir(theFileset.getName())).getCanonicalPath();
 
-            log.trace("begin directory traversal for conditional http request from " + getLocalSubPath());
+            log.info("traverse " + getLocalSubPath());
             long startTime = System.currentTimeMillis();
             for(FileRecord fr: FileRecord.getFileRecordsInDir(getLocalSubPath())) {
                 if(fr.getFile().getCanonicalPath().startsWith(cacheDir)) {
@@ -219,10 +224,5 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
                 return new FilesetListingResolution(theFileset, fileRecords);
             }
         }
-    }
-
-    @After(stages = LifecycleStage.ResolutionExecution)
-    public void after() {
-        log.trace("response sent");
     }
 }

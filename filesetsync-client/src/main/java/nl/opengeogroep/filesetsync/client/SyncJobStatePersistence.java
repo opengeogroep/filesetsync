@@ -68,12 +68,12 @@ public class SyncJobStatePersistence implements Serializable {
                 String version = ois.readUTF();
 
                 if(!Version.getProjectVersion().equals(version)) {
-                    log.info("Sync state saved with version " + version + ", ignoring");
+                    log.warn("Sync state saved with version " + version + ", ignoring");
                 } else {
                     instance = (SyncJobStatePersistence)ois.readObject();
                     ois.close();
                     instance.cleanup();
-                    log.info("Read sync job state from " + f.getAbsolutePath() + ", filesets: " + instance.states.keySet().toString());
+                    log.debug("Read sync job state from " + f.getAbsolutePath() + ", filesets: " + instance.states.keySet().toString());
                     if(log.isTraceEnabled()) {
                         for(Map.Entry<String,SyncJobState> entry: instance.states.entrySet()) {
                             log.trace("Fileset " + entry.getKey() + ": " + entry.getValue().toString());
