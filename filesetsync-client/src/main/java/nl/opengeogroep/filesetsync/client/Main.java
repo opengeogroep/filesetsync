@@ -88,15 +88,18 @@ public final class Main {
         }
         org.apache.log4j.PropertyConfigurator.configure(props);
 
-        log.info(String.format("%s %s starting",
+        log.info(String.format("%s %s starting (git commit %s, built at %s)",
                 Version.getProperty("project.name"),
-                Version.getProjectVersion()));
+                Version.getProjectVersion(),
+                Version.getProperty("git.commit.id"),
+                Version.getProperty("git.build.time")
+        ));
 
         StringWriter sw = new StringWriter();
         Version.getProperties().list(new PrintWriter(sw));
-        log.info(sw.toString());
+        log.trace(sw.toString());
 
-        log.info(SyncConfig.getInstance());
+        log.trace(SyncConfig.getInstance());
 
         File varDir = new File(SyncConfig.getInstance().getVarDir());
         if(!varDir.exists()) {

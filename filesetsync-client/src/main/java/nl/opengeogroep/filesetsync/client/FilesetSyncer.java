@@ -46,6 +46,7 @@ import static nl.opengeogroep.filesetsync.util.FormatUtil.*;
 import nl.opengeogroep.filesetsync.util.HttpUtil;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.mutable.MutableLong;
 import org.apache.commons.lang3.time.DurationFormatUtils;
@@ -90,6 +91,7 @@ public class FilesetSyncer {
     final private Map<String,String> localFilesByHash = new HashMap();
 
     public FilesetSyncer(Fileset fs) {
+        SyncJobStatePersistence.setCurrentFileset(fs);
         this.fs = fs;
         try {
             localCanonicalPath = new File(fs.getLocal()).getCanonicalPath();
@@ -105,11 +107,11 @@ public class FilesetSyncer {
             return;
         }
 
-        log.info("Starting sync for job with name " + fs.getName());
-        log.info(fs);
-        log.info(String.format("Last started %s and finished %s",
+        log.info(String.format("Starting sync for job \"%s\", last started %s and finished %s",
+                fs.getName(),
                 state.getLastRun() == null ? "never" : "at " + dateToString(state.getLastRun()),
                 state.getLastFinished() == null ? "never" : "at " + dateToString(state.getLastFinished())));
+        log.trace(fs);
 
         state.startNewRun();
 
@@ -133,13 +135,17 @@ public class FilesetSyncer {
         } catch(IOException e) {
             state.setFailedTries(state.getFailedTries()+1);
 
+            log.error("Exception during sync job: " + ExceptionUtils.getMessage(e));
+            log.trace("Full stack trace", e);
             if(state.getFailedTries() >= fs.getMaxTries()) {
-                log.error("Retryable IOException but max tries reached after " + state.getFailedTries() + " times, fatal error", e);
+                log.error("Retryable IOException but max tries reached after " + state.getFailedTries() + " times, fatal error");
                 state.endRun(STATE_ERROR);
             } else {
-                log.error(String.format("IO exception, retrying later after %d minutes (try %d of max %d)", fs.getRetryWaitTime(), state.getFailedTries(), fs.getMaxTries()), e);
+                log.error(String.format("IO exception, retrying later after %d minutes (try %d of max %d)", fs.getRetryWaitTime(), state.getFailedTries(), fs.getMaxTries()));
                 state.endRun(STATE_RETRY);
             }
+        } finally {
+            SyncJobStatePersistence.setCurrentFileset(null);
         }
     }
 
@@ -189,8 +195,11 @@ public class FilesetSyncer {
                             return Protocol.decodeFilelist(in);
                         }
                     } else {
-                        String entity = hr.getEntity() == null ? null : EntityUtils.toString(hr.getEntity());
-                        throw new ClientProtocolException("Unexpected response status: " + hr.getStatusLine() + ",  body: " + entity);
+                        if(log.isTraceEnabled()) {
+                            String entity = hr.getEntity() == null ? null : EntityUtils.toString(hr.getEntity());
+                            log.trace("Response body: " + entity);
+                        }
+                        throw new ClientProtocolException("Server error: " + hr.getStatusLine());
                     }
                 }
             };
@@ -221,7 +230,6 @@ public class FilesetSyncer {
                     SyncJobStatePersistence.persist();
                 }
             }
-            log.info("Filelist: " + fileList.size() + " entries");
         }
     }
 
@@ -321,19 +329,19 @@ public class FilesetSyncer {
                         if(hash.equals(fr.getHash())) {
                             log.trace("Same hash for " + fr.getName());
                             if(fr.getLastModified() > localFile.lastModified()) {
-                                log.info("Same hash, updating last modified for " + fr.getName());
+                                log.trace("Same hash, updating last modified for " + fr.getName());
                                 localFile.setLastModified(fr.getLastModified());
                             }
                             alreadyLocal.add(fr);
                         } else {
-                            log.info("Hash mismatch for " + fr.getName());
+                            log.trace("Hash mismatch for " + fr.getName());
                         }
                     } catch(Exception e) {
                         log.error("Error hashing " + localFile.getCanonicalPath() + ": " + ExceptionUtils.getMessage(e));
                     }
                 } else {
                     if(fr.getLastModified() > localFile.lastModified()) {
-                        log.debug("Remote file newer: " + fr.getName());
+                        log.trace("Remote file newer: " + fr.getName());
                     } else if(fr.getLastModified() < localFile.lastModified()) {
                         log.warn(String.format("Keeping local file last modified at %s, later than remote file at %s: ", dateToString(new Date(localFile.lastModified())), dateToString(new Date(fr.getLastModified())), fr.getName()));
                         alreadyLocal.add(fr);

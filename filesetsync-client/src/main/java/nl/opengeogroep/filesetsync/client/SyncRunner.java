@@ -17,7 +17,9 @@
 
 package nl.opengeogroep.filesetsync.client;
 
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
 import static javax.swing.JOptionPane.showMessageDialog;
 import static nl.opengeogroep.filesetsync.client.SyncJobState.*;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
@@ -48,8 +50,6 @@ public class SyncRunner extends Thread {
 
     @Override
     public void run() {
-        log.info("Checking filesets to synchronize...");
-
         if(config.getFilesets().isEmpty()) {
             showMessageDialog(null, L10n.s("filesets.none"));
             return;
@@ -93,44 +93,97 @@ public class SyncRunner extends Thread {
 
             SyncJobState state = SyncJobStatePersistence.getInstance().getState(fs.getName(), true);
             if(state.getCurrentState().equals(STATE_WAITING)) {
-
-                new FilesetSyncer(fs).sync();
-
-                while(state.getCurrentState().equals(STATE_RETRY)) {
-                    // Max wait time is 60 minutes, minimum 0
-                    int waitTime = Math.min(fs.getRetryWaitTime(), 60);
-                    try {
-                        Thread.sleep(waitTime * 1000);
-                    } catch(InterruptedException e) {
-                        if(Shutdown.isHappening()) {
-                            log.info("Interrupted by shutdown while waiting to retry");
-                        } else {
-                            log.info("Interrupted while waiting to retry (no shutdown), aborting");
-                        }
-                        return;
-                    }
-                    log.info("Retrying job after waiting");
-                    new FilesetSyncer(fs).sync();
-                }
+                runJobWithRetries(fs, state);
             }
         }
     }
 
-    private void loopScheduledJobs() {
-        while(true) {
-            /* check all filesets and check in priority order if it should run
-             * according to schedule.
-             */
+    private void runJobWithRetries(Fileset fs, SyncJobState state) {
+        new FilesetSyncer(fs).sync();
 
-            /* We do not use Quartz as it can only persistently store jobs in a
-             * database. Using an embedded JavaDB adds stupid amounts of complexity.
-             * Downside is we only support a "daily" or "hourly" schedule at the
-             * moment.
-             */
-
-            // TODO: do scheduled jobs
-
-            throw new UnsupportedOperationException();
+        while(state.getCurrentState().equals(STATE_RETRY)) {
+            // Max wait time is 60 minutes, minimum 0
+            int waitTime = Math.min(fs.getRetryWaitTime(), 60);
+            try {
+                Thread.sleep(waitTime * 1000);
+            } catch(InterruptedException e) {
+                if(Shutdown.isHappening()) {
+                    log.info("Interrupted by shutdown while waiting to retry");
+                } else {
+                    log.info("Interrupted while waiting to retry (no shutdown), aborting");
+                }
+                return;
+            }
+            log.info("Retrying job after waiting");
+            new FilesetSyncer(fs).sync();
         }
+    }
+
+    private void runScheduledJobWithRetries(Fileset fs, SyncJobState state) {
+        runJobWithRetries(fs, state);
+        boolean success = state.getCurrentState().equals(STATE_COMPLETED);
+        // Keep scheduled, also on error
+        state.setCurrentState(STATE_WAITING);
+        SyncJobStatePersistence.persist();
+
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        log.info(String.format("Next run date for %s %s job \"%s\": %s",
+                success ? "successfully completed" : "failed",
+                fs.getSchedule(),
+                fs.getName(),
+                sdf.format(state.calculateNextRunDate(fs))));
+
+    }
+
+    private void loopScheduledJobs() {
+
+        Date earliestNextRunDate;
+        Fileset earliestNextRunFileset;
+        do {
+            earliestNextRunDate = null;
+            earliestNextRunFileset = null;
+
+            for(Fileset fs: config.getFilesets()) {
+                if(Fileset.SCHEDULE_ONCE.equals(fs.getSchedule())) {
+                    continue;
+                }
+
+                SyncJobState state = SyncJobStatePersistence.getInstance().getState(fs.getName(), true);
+                if(state.getCurrentState().equals(STATE_WAITING)) {
+                    Date nextRunAt = state.calculateNextRunDate(fs);
+
+                    if(nextRunAt == null || nextRunAt.before(new Date())) {
+                        runScheduledJobWithRetries(fs, state);
+                        nextRunAt = state.calculateNextRunDate(fs);
+                    }
+
+                    if(earliestNextRunDate == null || nextRunAt.before(earliestNextRunDate)) {
+                        earliestNextRunDate = nextRunAt;
+                        earliestNextRunFileset = fs;
+                    }
+                }
+            }
+
+            if(earliestNextRunDate != null) {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                log.info(String.format("Waiting until %s to execute earliest scheduled %s job \"%s\"...",
+                        sdf.format(earliestNextRunDate),
+                        earliestNextRunFileset.getSchedule(),
+                        earliestNextRunFileset.getName()));
+
+                try {
+                    Thread.sleep(Math.max(1000, earliestNextRunDate.getTime() - new Date().getTime() + 500));
+                } catch(InterruptedException e) {
+                    if(Shutdown.isHappening()) {
+                        log.info("Interrupted by shutdown while waiting for next scheduled job to run");
+                        return;
+                    } else {
+                        log.info("Interrupted while waiting for next scheduled job");
+                    }
+                }
+            }
+        } while(earliestNextRunDate != null);
+
+        log.info("No scheduled jobs, quitting");
     }
 }

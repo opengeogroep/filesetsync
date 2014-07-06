@@ -140,6 +140,14 @@ public class SyncConfig {
         return null;
     }
 
+    public int getMaxFilesetNameLength() {
+        int l = 0;
+        for(Fileset fs: filesets) {
+            l = Math.max(l, fs.getName().length());
+        }
+        return l;
+    }
+
     public String getProperty(String name, String defaultValue) {
         for(Property p: properties) {
             if(p.getName().equals(name)) {

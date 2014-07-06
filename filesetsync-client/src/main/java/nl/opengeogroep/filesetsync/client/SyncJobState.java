@@ -22,11 +22,14 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import nl.opengeogroep.filesetsync.FileRecord;
+import nl.opengeogroep.filesetsync.client.config.Fileset;
 import nl.opengeogroep.filesetsync.protocol.Protocol;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import nl.opengeogroep.filesetsync.protocol.BufferedFileListEncoder;
@@ -174,5 +177,20 @@ public class SyncJobState implements Serializable {
         setCurrentState(state);
 
         SyncJobStatePersistence.persist();
+    }
+
+    public Date calculateNextRunDate(Fileset fs) {
+        if(lastRun == null) {
+            return null;
+        } else {
+            Calendar c = GregorianCalendar.getInstance();
+            c.setTime(lastRun);
+            if(Fileset.SCHEDULE_HOURLY.equals(fs.getSchedule())) {
+                c.add(Calendar.HOUR_OF_DAY, 1);
+            } else {
+                c.add(Calendar.DAY_OF_YEAR, 1);
+            }
+            return c.getTime();
+        }
     }
 }

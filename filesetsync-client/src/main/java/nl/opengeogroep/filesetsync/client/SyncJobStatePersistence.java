@@ -27,11 +27,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import nl.opengeogroep.filesetsync.client.config.Fileset;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import nl.opengeogroep.filesetsync.client.util.Version;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.MDC;
 
 /**
  *
@@ -71,9 +74,9 @@ public class SyncJobStatePersistence implements Serializable {
                     ois.close();
                     instance.cleanup();
                     log.info("Read sync job state from " + f.getAbsolutePath() + ", filesets: " + instance.states.keySet().toString());
-                    if(log.isDebugEnabled()) {
+                    if(log.isTraceEnabled()) {
                         for(Map.Entry<String,SyncJobState> entry: instance.states.entrySet()) {
-                            log.debug("Fileset " + entry.getKey() + ": " + entry.getValue().toString());
+                            log.trace("Fileset " + entry.getKey() + ": " + entry.getValue().toString());
                         }
                     }
                 }
@@ -120,5 +123,14 @@ public class SyncJobStatePersistence implements Serializable {
             states.put(filesetName, state);
         }
         return state;
+    }
+
+    public static void setCurrentFileset(Fileset fs) {
+        int l = SyncConfig.getInstance().getMaxFilesetNameLength();
+        if(fs == null) {
+            MDC.put("fileset", StringUtils.repeat(' ', l));
+        } else {
+            MDC.put("fileset", StringUtils.repeat(' ', l - fs.getName().length()) + fs.getName());
+        }
     }
 }
