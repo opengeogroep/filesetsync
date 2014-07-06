@@ -57,22 +57,7 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
 
     public Resolution get() throws Exception {
 
-        // check if path is single file
-        final File f = new File(getLocalSubPath());
-        if(f.isFile()) {
-            return new StreamingResolution("application/octet-stream", new FileInputStream(f)) {
-                @Override
-                protected void applyHeaders(HttpServletResponse response) {
-                    super.applyHeaders(response);
-                    response.setContentLength((int)f.length());
-                }
-            };
-        } else if(!f.isDirectory()) {
-            return new ErrorMessageResolution("Error: path is not a file or directory");
-        }
-
         Iterable<FileRecord> filesToStream;
-
         if(FILELIST_MIME_TYPE.equals(getContext().getRequest().getContentType())) {
 
             InputStream in = getContext().getRequest().getInputStream();
@@ -106,6 +91,20 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
                     unacceptableFiles));
             filesToStream = requestedFiles;
         } else {
+            // check if path is single file
+            final File f = new File(getLocalSubPath());
+            if(f.isFile()) {
+                return new StreamingResolution("application/octet-stream", new FileInputStream(f)) {
+                    @Override
+                    protected void applyHeaders(HttpServletResponse response) {
+                        super.applyHeaders(response);
+                        response.setContentLength((int)f.length());
+                    }
+                };
+            } else if(!f.isDirectory()) {
+                return new ErrorMessageResolution("Error: path is not a file or directory");
+            }
+
             log.info("recursively streaming " + getLocalSubPath());
             filesToStream = FileRecord.getFileRecordsInDir(getLocalSubPath());
         }

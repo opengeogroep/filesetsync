@@ -309,7 +309,13 @@ public class FilesetSyncer {
                 return;
             }
 
-            File localFile = new File(fs.getLocal() + File.separator + fr.getName());
+            File localFile;
+            if(fileList.size() == 1 && fr.getType() == TYPE_FILE) {
+                localFile = new File(fs.getLocal());
+                localFile.getParentFile().mkdirs();
+            } else {
+                localFile = new File(fs.getLocal() + File.separator + fr.getName());
+            }
             if(fr.getType() == TYPE_DIRECTORY && localFile.exists()) {
                 if(!localFile.isDirectory()) {
                     log.error("Local file in is the way for remote directory: " + localFile.getCanonicalPath());
@@ -406,7 +412,7 @@ public class FilesetSyncer {
                 }
             }
             List<FileRecord> chunkList = fileList.subList(index, endIndex+1);
-            log.info(String.format("Requesting chunk of %d files (size %d KB)", chunkList.size(), thisChunkSize));
+            log.info(String.format("Requesting chunk of %d files (size %.0f KB)", chunkList.size(), thisChunkSize/1024.0));
             if(log.isTraceEnabled()) {
                 int t = 0;
                 for(FileRecord fr: chunkList) {
@@ -510,6 +516,9 @@ public class FilesetSyncer {
                             throw e;
                         }
                         local.setLastModified(mfh.getLastModified().getTime());
+                    }
+                    if(decoder.getIOException() != null) {
+                        throw decoder.getIOException();
                     }
                 }
             }

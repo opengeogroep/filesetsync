@@ -22,12 +22,19 @@ public class MultiFileDecoder implements Iterator<MultiFileHeader>, Iterable<Mul
 
     private MultiFileHeader next, previous;
 
+    private IOException exception;
+
     public MultiFileDecoder(InputStream in) {
         this.in = new DataInputStream(in);
     }
 
     public DataInputStream getDataStream() {
         return in;
+    }
+
+    /* hasNext() and next() can't throw exceptions... */
+    public IOException getIOException() {
+        return exception;
     }
 
     @Override
@@ -48,7 +55,7 @@ public class MultiFileDecoder implements Iterator<MultiFileHeader>, Iterable<Mul
                 log.error("Error skipping multifile body", e);
             }
         }
-        
+
         try {
             next = new MultiFileHeader(in);
             if(next.status == HttpStatus.SC_NO_CONTENT) {
@@ -57,9 +64,11 @@ public class MultiFileDecoder implements Iterator<MultiFileHeader>, Iterable<Mul
             return true;
         } catch(EOFException e) {
             log.error("Unexpected EOF (No content header expected)");
+            exception = e;
             return false;
         } catch(IOException e) {
             log.error("Error decoding multifile stream", e);
+            exception = e;
             return false;
         }
     }
