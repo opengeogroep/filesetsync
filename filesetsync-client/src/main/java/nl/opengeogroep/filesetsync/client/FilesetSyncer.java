@@ -198,6 +198,8 @@ public class FilesetSyncer {
                         if(log.isTraceEnabled()) {
                             String entity = hr.getEntity() == null ? null : EntityUtils.toString(hr.getEntity());
                             log.trace("Response body: " + entity);
+                        } else {
+                            EntityUtils.consumeQuietly(hr.getEntity());
                         }
                         throw new ClientProtocolException("Server error: " + hr.getStatusLine());
                     }
