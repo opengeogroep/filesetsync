@@ -59,6 +59,8 @@ public class SyncJobState implements Serializable {
 
     private Date fileListDate;
 
+    private boolean fileListHashed;
+
     // <editor-fold defaultstate="collapsed" desc="getters and setters">
     public Date getLastRun() {
         return lastRun;
@@ -106,6 +108,14 @@ public class SyncJobState implements Serializable {
 
     public void setFileListDate(Date fileListDate) {
         this.fileListDate = fileListDate;
+    }
+
+    public boolean isFileListHashed() {
+        return fileListHashed;
+    }
+
+    public void setFileListHashed(boolean fileListHashed) {
+        this.fileListHashed = fileListHashed;
     }
     // </editor-fold>
 

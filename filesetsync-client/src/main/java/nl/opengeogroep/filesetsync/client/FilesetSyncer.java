@@ -137,6 +137,7 @@ public class FilesetSyncer {
 
         final boolean cachedFileList = state.getFileListDate() != null
                 && state.getFileListRemotePath().equals(fs.getRemote())
+                && (!fs.isHash() || state.isFileListHashed())
                 && SyncJobState.haveCachedFileList(fs.getName());
 
         String s = "Retrieving file list";
@@ -289,6 +290,10 @@ public class FilesetSyncer {
                         hashBytes += localFile.length();
                         if(hash.equals(fr.getHash())) {
                             log.trace("Same hash for " + fr.getName());
+                            if(fr.getLastModified() > localFile.lastModified()) {
+                                log.info("Same hash, updating last modified for " + fr.getName());
+                                localFile.setLastModified(fr.getLastModified());
+                            }
                             alreadyLocal.add(fr);
                         } else {
                             log.info("Hash mismatch for " + fr.getName());
