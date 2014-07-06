@@ -325,7 +325,7 @@ public class FilesetSyncer {
                     log.error("Local file in is the way for remote directory: " + localFile.getCanonicalPath());
                 }
                 if(fr.getLastModified() != localFile.lastModified()) {
-                    log.info(String.format("Later updating last modified for directory %s", localFile.getCanonicalPath()));
+                    log.trace(String.format("later updating last modified for directory %s", localFile.getCanonicalPath()));
                     directoriesLastModifiedTimes.add(Pair.of(localFile, fr.getLastModified()));
                 }
                 alreadyLocal.add(fr);
