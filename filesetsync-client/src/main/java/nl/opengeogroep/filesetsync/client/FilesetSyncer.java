@@ -453,6 +453,7 @@ public class FilesetSyncer {
                     int i = 0;
                     for(MultiFileHeader mfh: decoder) {
                         if(Shutdown.isHappening()) {
+                            post.abort();
                             return;
                         }
 
