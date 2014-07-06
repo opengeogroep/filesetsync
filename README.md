@@ -46,8 +46,10 @@ The application looks for a file named ```filesetsync-config.xml``` in the direc
             
     <filesets>
         <fileset name="myfileset" server="https://localhost/sync/">
-            <priority>1</priority>
             <!-- only 'once', 'hourly' or 'daily' supported for now -->
+            <!-- all jobs with schedule 'once' are run first (in order) -->
+            <!-- then the hourly and daily jobs are scheduled to run
+                 according to the last start time -->
             <schedule>once</schedule>
             <direction>download</direction>
             <remote>myfileset</remote>

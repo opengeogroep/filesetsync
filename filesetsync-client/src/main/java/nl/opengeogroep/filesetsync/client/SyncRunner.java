@@ -17,6 +17,7 @@
 
 package nl.opengeogroep.filesetsync.client;
 
+import java.util.Calendar;
 import static javax.swing.JOptionPane.showMessageDialog;
 import static nl.opengeogroep.filesetsync.client.SyncJobState.*;
 import nl.opengeogroep.filesetsync.client.config.Fileset;

@@ -70,7 +70,7 @@ public class SyncConfig {
     List<Property> properties = new ArrayList();
 
     /**
-     * Filesets to synchronize. Sorted according to priority (lowest first).
+     * Filesets to synchronize. Executed in order.
      */
     @XmlElementWrapper(name = "filesets")
     @XmlElement(name = "fileset")
@@ -123,8 +123,6 @@ public class SyncConfig {
         } finally {
             in.close();
         }
-
-        Collections.sort(instance.filesets);
 
         File f = new File(instance.varDir);
         if(!f.isAbsolute()) {

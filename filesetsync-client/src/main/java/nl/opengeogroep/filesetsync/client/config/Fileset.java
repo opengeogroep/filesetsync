@@ -34,7 +34,7 @@ import org.apache.commons.lang3.builder.ToStringStyle;
  * @author Matthijs Laan
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-public class Fileset implements Comparable {
+public class Fileset {
     public static final String DIRECTION_DOWNLOAD = "download";
     public static final String DIRECTION_UPLOAD = "upload";
 
@@ -53,13 +53,6 @@ public class Fileset implements Comparable {
      */
     @XmlAttribute(required=true)
     private String server;
-
-    /**
-     * Relative priority of this fileset to other filesets. Lower numbers will
-     * be prioritized to sync first.
-     */
-    @XmlElement
-    private Double priority;
 
     /**
      * When to synchronize this fileset. No schedule means run once at startup.
@@ -136,14 +129,6 @@ public class Fileset implements Comparable {
         this.server = server;
     }
 
-    public Double getPriority() {
-        return priority;
-    }
-
-    public void setPriority(Double priority) {
-        this.priority = priority;
-    }
-
     public String getSchedule() {
         return schedule;
     }
@@ -216,20 +201,6 @@ public class Fileset implements Comparable {
         this.properties = properties;
     }
     // </editor-fold>
-
-    public int compareTo(Object other) {
-        Fileset rhs = (Fileset)other;
-
-        if(rhs.priority == null) {
-            // Higher priority
-            return -1;
-        } else if(priority == null) {
-            // Lower priority
-            return 1;
-        } else {
-            return priority.compareTo(rhs.priority);
-        }
-    }
 
     @Override
     public String toString() {
