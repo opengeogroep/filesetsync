@@ -17,10 +17,8 @@
 
 package nl.opengeogroep.filesetsync.client;
 
-import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import static javax.swing.JOptionPane.showMessageDialog;
+import static nl.opengeogroep.filesetsync.client.SyncJobState.*;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import nl.opengeogroep.filesetsync.client.util.L10n;
@@ -37,6 +35,9 @@ public class SyncRunner extends Thread {
 
     static SyncRunner instance;
 
+    SyncConfig config = SyncConfig.getInstance();
+    SyncJobStatePersistence statePersistence = SyncJobStatePersistence.getInstance();
+
     public static SyncRunner getInstance() {
         if(instance == null) {
             instance = new SyncRunner();
@@ -46,9 +47,75 @@ public class SyncRunner extends Thread {
 
     @Override
     public void run() {
-        SyncConfig config = SyncConfig.getInstance();
+        log.info("Checking filesets to synchronize...");
 
-        // Never give up
+        if(config.getFilesets().isEmpty()) {
+            showMessageDialog(null, L10n.s("filesets.none"));
+            return;
+        }
+
+        // Initialize all states to Waiting
+        for(Fileset fs: config.getFilesets()) {
+            SyncJobState state = statePersistence.getState(fs.getName(), true);
+            state.setCurrentState(SyncJobState.STATE_WAITING);
+        }
+
+        doRunOnceJobs();
+
+        if(Shutdown.isHappening()) {
+            return;
+        }
+
+        boolean haveScheduled = false;
+        for(Fileset fs: config.getFilesets()) {
+            if(!fs.getSchedule().equals(Fileset.SCHEDULE_ONCE)) {
+                haveScheduled = true;
+            }
+        }
+
+        if(haveScheduled) {
+            loopScheduledJobs();
+        } else {
+            log.info("No scheduled jobs, exiting");
+        }
+
+    }
+
+    private void doRunOnceJobs() {
+        // Iterator is in order of highest priority first
+
+        // Do all filesets with schedule set to 'once' first, including retries
+        for(Fileset fs: config.getFilesets()) {
+            if(!Fileset.SCHEDULE_ONCE.equals(fs.getSchedule())) {
+                continue;
+            }
+
+            SyncJobState state = SyncJobStatePersistence.getInstance().getState(fs.getName(), true);
+            if(state.getCurrentState().equals(STATE_WAITING)) {
+
+                new FilesetSyncer(fs).sync();
+
+                while(state.getCurrentState().equals(STATE_RETRY)) {
+                    // Max wait time is 60 minutes, minimum 0
+                    int waitTime = Math.min(fs.getRetryWaitTime(), 60);
+                    try {
+                        Thread.sleep(waitTime * 1000);
+                    } catch(InterruptedException e) {
+                        if(Shutdown.isHappening()) {
+                            log.info("Interrupted by shutdown while waiting to retry");
+                        } else {
+                            log.info("Interrupted while waiting to retry (no shutdown), aborting");
+                        }
+                        return;
+                    }
+                    log.info("Retrying job after waiting");
+                    new FilesetSyncer(fs).sync();
+                }
+            }
+        }
+    }
+
+    private void loopScheduledJobs() {
         while(true) {
             /* check all filesets and check in priority order if it should run
              * according to schedule.
@@ -60,38 +127,9 @@ public class SyncRunner extends Thread {
              * moment.
              */
 
-            log.info("Checking filesets to synchronize...");
+            // TODO: do scheduled jobs
 
-            if(config.getFilesets().isEmpty()) {
-                showMessageDialog(null, L10n.s("filesets.none"));
-                return;
-            }
-
-            SyncJobStatePersistence statePersistence = SyncJobStatePersistence.getInstance();
-
-            // Initialize all states to Waiting
-            for(Fileset fs: config.getFilesets()) {
-                SyncJobState state = statePersistence.getState(fs.getName(), true);
-                state.setCurrentState(SyncJobState.STATE_WAITING);
-            }
-
-            // Iterator is in order of highest priority first
-            for(Fileset fs: config.getFilesets()) {
-
-                String schedule = fs.getSchedule();
-
-                if(Fileset.SCHEDULE_ONCE.equals(schedule)) {
-                    try {
-                        // XXX remove from filesets so program exits at all...
-                        new FilesetSyncer(fs).sync();
-                    } catch (IOException ex) {
-                        System.exit(1);
-                    }
-                    System.exit(0);
-                } else {
-                    throw new UnsupportedOperationException();
-                }
-            }
+            throw new UnsupportedOperationException();
         }
     }
 }

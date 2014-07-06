@@ -61,7 +61,7 @@ public class SyncJobState implements Serializable {
 
     private boolean fileListHashed;
 
-    private int failedTries;
+    private transient int failedTries;
 
     // <editor-fold defaultstate="collapsed" desc="getters and setters">
     public Date getLastRun() {

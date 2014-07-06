@@ -107,7 +107,7 @@ public class Fileset implements Comparable {
     private int maxTries = 5;
 
     /**
-     * Alternate retry wait time in minutes.
+     * Alternate retry wait time in seconds.
      */
     @XmlElement
     private int retryWaitTime = 1;

@@ -103,6 +103,8 @@ public final class Main {
             varDir.mkdirs();
         }
 
+        Runtime.getRuntime().addShutdownHook(new Shutdown());
+
         SyncJobStatePersistence.initialize();
         SyncRunner.getInstance().start();
     }

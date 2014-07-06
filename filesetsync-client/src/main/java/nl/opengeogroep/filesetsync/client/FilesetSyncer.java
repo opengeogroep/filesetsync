@@ -89,13 +89,22 @@ public class FilesetSyncer {
 
     final private Map<String,String> localFilesByHash = new HashMap();
 
-    public FilesetSyncer(Fileset fs) throws IOException {
+    public FilesetSyncer(Fileset fs) {
         this.fs = fs;
-        localCanonicalPath = new File(fs.getLocal()).getCanonicalPath();
+        try {
+            localCanonicalPath = new File(fs.getLocal()).getCanonicalPath();
+        } catch(IOException e) {
+            log.error("Error determining local canonical path", e);
+        }
         state = SyncJobStatePersistence.getInstance().getState(fs.getName(), true);
     }
 
     public void sync() {
+        if(localCanonicalPath == null) {
+            state.endRun(STATE_ERROR);
+            return;
+        }
+
         log.info("Starting sync for job with name " + fs.getName());
         log.info(fs);
         log.info(String.format("Last started %s and finished %s",
@@ -125,10 +134,10 @@ public class FilesetSyncer {
             state.setFailedTries(state.getFailedTries()+1);
 
             if(state.getFailedTries() >= fs.getMaxTries()) {
-                log.error("Retryable IOException but max tries reached after " + state.getFailedTries() + " times, job disabled until restart", e);
+                log.error("Retryable IOException but max tries reached after " + state.getFailedTries() + " times, fatal error", e);
                 state.endRun(STATE_ERROR);
             } else {
-                log.error(String.format("IO exception, retrying later after %d minutes (%d tries)", fs.getRetryWaitTime(), state.getFailedTries()), e);
+                log.error(String.format("IO exception, retrying later after %d minutes (try %d of max %d)", fs.getRetryWaitTime(), state.getFailedTries(), fs.getMaxTries()), e);
                 state.endRun(STATE_RETRY);
             }
         }
@@ -217,6 +226,10 @@ public class FilesetSyncer {
     }
 
     private void deleteLocalFiles() {
+        if(Shutdown.isHappening()) {
+            return;
+        }
+
         for(List<FileRecord> dirList: new FileRecordListDirectoryIterator(fileList)) {
             Iterator<FileRecord> it = dirList.iterator();
             FileRecord dir = it.next();
@@ -248,6 +261,10 @@ public class FilesetSyncer {
             }
 
             for(String deleteIt: toDelete) {
+                if(Shutdown.isHappening()) {
+                    return;
+                }
+
                 File f = new File(localDir + File.separator + deleteIt);
                 try {
                     if(f.isDirectory()) {
@@ -277,6 +294,10 @@ public class FilesetSyncer {
         long startTime = System.currentTimeMillis();
 
         for(FileRecord fr: fileList) {
+            if(Shutdown.isHappening()) {
+                return;
+            }
+
             File localFile = new File(fs.getLocal() + File.separator + fr.getName());
             if(fr.getType() == TYPE_DIRECTORY && localFile.exists()) {
                 if(!localFile.isDirectory()) {
@@ -343,6 +364,10 @@ public class FilesetSyncer {
     }
 
     private void transferFiles() throws IOException {
+        if(Shutdown.isHappening()) {
+            return;
+        }
+
         if(fileList.isEmpty()) {
             log.info("No files to transfer");
             return;
@@ -378,6 +403,10 @@ public class FilesetSyncer {
                 }
             }
             transferChunk(chunkList);
+            if(Shutdown.isHappening()) {
+                return;
+            }
+
             index = endIndex+1;
             chunks++;
         } while(endIndex < fileList.size()-1);
@@ -408,6 +437,10 @@ public class FilesetSyncer {
             try(CloseableHttpResponse response = httpClient.execute(post)) {
                 log.info("< " + response.getStatusLine());
 
+                if(Shutdown.isHappening()) {
+                    return;
+                }
+
                 int status = response.getStatusLine().getStatusCode();
                 if(status < 200 || status >= 300) {
                     throw new IOException(String.format("Server returned \"%s\" for request \"%s\", body: %s",
@@ -419,6 +452,10 @@ public class FilesetSyncer {
                 try(MultiFileDecoder decoder = new MultiFileDecoder(response.getEntity().getContent())) {
                     int i = 0;
                     for(MultiFileHeader mfh: decoder) {
+                        if(Shutdown.isHappening()) {
+                            return;
+                        }
+
                         log.trace(String.format("File #%3d: %8d bytes, %s, %s", ++i, mfh.getContentLength(), mfh.getContentType(), mfh.getFilename()));
                         File local;
                         if(mfh.getFilename().equals(".")) {
