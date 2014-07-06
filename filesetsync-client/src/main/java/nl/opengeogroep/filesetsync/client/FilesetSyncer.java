@@ -241,6 +241,10 @@ public class FilesetSyncer {
             return;
         }
 
+        if(fileList.size() == 1 && fileList.get(0).getType() == TYPE_FILE) {
+            return;
+        }
+
         for(List<FileRecord> dirList: new FileRecordListDirectoryIterator(fileList)) {
             Iterator<FileRecord> it = dirList.iterator();
             FileRecord dir = it.next();
