@@ -103,7 +103,7 @@ public class SyncRunner extends Thread {
 
         while(state.getCurrentState().equals(STATE_RETRY)) {
             // Max wait time is 60 minutes, minimum 0
-            int waitTime = Math.min(fs.getRetryWaitTime(), 60);
+            int waitTime = Math.min(fs.getRetryWaitTime(), 60 * 1000);
             try {
                 Thread.sleep(waitTime * 1000);
             } catch(InterruptedException e) {
