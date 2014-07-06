@@ -1,6 +1,7 @@
 
 package nl.opengeogroep.filesetsync.protocol;
 
+import java.io.Closeable;
 import java.io.DataOutputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -20,7 +21,7 @@ import org.apache.http.entity.ContentType;
  *
  * @author Matthijs Laan
  */
-public class MultiFileEncoder implements AutoCloseable {
+public class MultiFileEncoder implements Closeable, AutoCloseable {
     public static final String MULTIFILE_MIME_TYPE = "application/x-filesetsync-multifile";
     static final String CONTENT_TYPE_DIRECTORY = "application/x-filesetsync-directory";
     static final String HEADER_FILENAME = "X-Filesetsync-Filename";

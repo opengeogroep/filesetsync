@@ -2,6 +2,7 @@
 package nl.opengeogroep.filesetsync.protocol;
 
 import java.io.BufferedWriter;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -13,7 +14,7 @@ import static nl.opengeogroep.filesetsync.protocol.Protocol.FILELIST_ENCODING;
  *
  * @author Matthijs Laan
  */
-public class BufferedFileListEncoder implements AutoCloseable {
+public class BufferedFileListEncoder implements Closeable, AutoCloseable {
     private static final String FILELIST_HEADER_START = "filesetsync:filelist:start";
     private static final String FILELIST_HEADER_END = "filesetsync:filelist:end";
 

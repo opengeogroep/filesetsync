@@ -39,6 +39,7 @@ import static nl.opengeogroep.filesetsync.protocol.Protocol.FILELIST_ENCODING;
 import nl.opengeogroep.filesetsync.server.FileHashCache;
 import nl.opengeogroep.filesetsync.server.ServerFileset;
 import static nl.opengeogroep.filesetsync.util.FormatUtil.dateToString;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.mutable.MutableLong;
 import org.apache.commons.lang3.time.DurationFormatUtils;
@@ -149,8 +150,8 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
                     }
                 }
             } finally {
-                encoder.close();
-                out.close();
+                IOUtils.closeQuietly(encoder);
+                IOUtils.closeQuietly(out);
 
                 String hashInfo;
                 if(hash) {

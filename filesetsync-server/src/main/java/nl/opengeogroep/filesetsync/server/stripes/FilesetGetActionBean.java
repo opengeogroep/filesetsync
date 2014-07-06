@@ -35,6 +35,7 @@ import nl.opengeogroep.filesetsync.protocol.MultiFileEncoder;
 import static nl.opengeogroep.filesetsync.protocol.MultiFileEncoder.MULTIFILE_MIME_TYPE;
 import nl.opengeogroep.filesetsync.protocol.Protocol;
 import static nl.opengeogroep.filesetsync.protocol.Protocol.FILELIST_MIME_TYPE;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.logging.Log;
@@ -152,8 +153,8 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
                     }
                 }
             } finally {
-                streamer.close();
-                uncompressedCounter.close();
+                IOUtils.closeQuietly(streamer);
+                IOUtils.closeQuietly(uncompressedCounter);
 
                 long compressedBytes = compressedCounter.getByteCount();
                 long uncompressedBytes = uncompressedCounter.getByteCount();
