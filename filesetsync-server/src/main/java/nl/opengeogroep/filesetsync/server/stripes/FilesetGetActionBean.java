@@ -85,10 +85,10 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
                     totalSize += localFile.length();
                 }
             }
-            log.info(String.format("streaming %d files (total %d bytes), removed %d unacceptable requested files",
+            log.info(String.format("streaming %d files (total %.0f KB)%s",
                     requestedFiles.size(),
-                    totalSize,
-                    unacceptableFiles));
+                    totalSize / 1024.0,
+                    unacceptableFiles != 0 ? ", removed " + unacceptableFiles + " unacceptable requested files" : ""));
             filesToStream = requestedFiles;
         } else {
             // check if path is single file

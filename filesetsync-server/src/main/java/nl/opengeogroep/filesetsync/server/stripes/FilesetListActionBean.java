@@ -129,7 +129,7 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
                             encoder.write(fr);
                         } catch(IOException e) {
                             if(e.getClass().getName().endsWith("ClientAbortException")) {
-                                log.warn("received client calculating hash of " + canonicalPath);
+                                log.warn("received client abort calculating hash of " + canonicalPath);
                                 return;
                             } else {
                                 log.error("error calculating hash of " + canonicalPath + ": " + ExceptionUtils.getMessage(e));
