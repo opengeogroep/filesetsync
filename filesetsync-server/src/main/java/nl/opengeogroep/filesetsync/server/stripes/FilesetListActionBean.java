@@ -150,21 +150,22 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
 
             String hashInfo;
             if(hash) {
-                hashInfo = String.format("hashed %d KB (cache hit rate %.1f%%)",
+                hashInfo = String.format(", hashed %d KB (cache hit rate %.1f%%), hash time %s, hash speed %s",
                         hashBytes.getValue() / 1024,
-                        Math.abs(100-(100.0/totalBytes*hashBytes.getValue())));
+                        Math.abs(100-(100.0/totalBytes*hashBytes.getValue())),
+                        DurationFormatUtils.formatDurationWords(hashTime.getValue(), true, false),
+                        (hashTime.getValue() < 100 ? "n/a" : Math.round(hashBytes.getValue() / 1024.0 / (hashTime.getValue() / 1000.0)) + " KB/s")
+                );
             } else {
-                hashInfo = "no hashing";
+                hashInfo = " (no hashing)";
             }
 
-            log.info(String.format("returned %d directories and %d files, total size %d KB, time %s, %s, hash time %s, hash speed %s",
+            log.info(String.format("returned %d directories and %d files, total size %d KB, time %s%s",
                     dirs,
                     files,
                     totalBytes / 1024,
                     DurationFormatUtils.formatDurationWords(System.currentTimeMillis() - startTime, true, false),
-                    hashInfo,
-                    DurationFormatUtils.formatDurationWords(hashTime.getValue(), true, false),
-                    (hashTime.getValue() < 100 ? "n/a" : Math.round(hashBytes.getValue() / 1024.0 / (hashTime.getValue() / 1000.0)) + " KB/s")
+                    hashInfo
             ));
         }
     }
