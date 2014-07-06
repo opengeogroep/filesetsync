@@ -20,10 +20,11 @@ package nl.opengeogroep.filesetsync.server.stripes;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import javax.servlet.http.HttpServletResponse;
-import net.sourceforge.stripes.action.ActionBeanContext;
 import net.sourceforge.stripes.action.After;
 import net.sourceforge.stripes.action.Resolution;
 import net.sourceforge.stripes.action.StreamingResolution;
@@ -40,6 +41,7 @@ import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.HttpHeaders;
 
 /**
  *
@@ -53,18 +55,6 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
     @Override
     protected final String getLogName() {
         return "api.get";
-    }
-
-    private ActionBeanContext context;
-
-    @Override
-    public ActionBeanContext getContext() {
-        return context;
-    }
-
-    @Override
-    public void setContext(ActionBeanContext context) {
-        this.context = context;
     }
 
     public Resolution get() throws Exception {
@@ -85,8 +75,13 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
 
         Iterable<FileRecord> filesToStream;
 
-        if(FILELIST_MIME_TYPE.equals(context.getRequest().getContentType())) {
-            List<FileRecord> requestedFiles = Protocol.decodeFilelist(context.getRequest().getInputStream());
+        if(FILELIST_MIME_TYPE.equals(getContext().getRequest().getContentType())) {
+
+            InputStream in = getContext().getRequest().getInputStream();
+            if("gzip".equals(getContext().getRequest().getHeader(HttpHeaders.CONTENT_ENCODING))) {
+                in = new GZIPInputStream(in);
+            }
+            List<FileRecord> requestedFiles = Protocol.decodeFilelist(in);
             long totalSize = 0;
             int unacceptableFiles = 0;
             String canonicalFilesetPath = new File(getFileset().getPath()).getCanonicalPath();
@@ -167,7 +162,7 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
                     uncompressedBytes / 1024,
                     Math.abs(100-(100.0/uncompressedBytes*compressedBytes)),
                     DurationFormatUtils.formatDurationWords(duration, true, false),
-                    (duration < 100 ? "n/a" : ", " + Math.round(compressedBytes / 1024.0 / (duration / 1000.0)) + " KB/s")
+                    (duration < 100 ? "" : ", " + Math.round(compressedBytes / 1024.0 / (duration / 1000.0)) + " KB/s")
             ));
 
         }

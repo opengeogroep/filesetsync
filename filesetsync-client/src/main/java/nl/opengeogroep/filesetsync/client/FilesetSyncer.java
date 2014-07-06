@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.GZIPOutputStream;
 import nl.opengeogroep.filesetsync.FileRecord;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_FILE;
@@ -438,10 +439,11 @@ public class FilesetSyncer {
             HttpPost post = new HttpPost(serverUrl + "get/" + fs.getRemote());
 
             ByteArrayOutputStream b = new ByteArrayOutputStream();
-            new BufferedFileListEncoder(b).writeAll(chunkList).close();
+            new BufferedFileListEncoder(new GZIPOutputStream(b)).writeAll(chunkList).close();
 
             post.setEntity(new ByteArrayEntity(b.toByteArray()));
             post.setHeader(HttpHeaders.CONTENT_TYPE, Protocol.FILELIST_MIME_TYPE);
+            post.setHeader(HttpHeaders.CONTENT_ENCODING, "gzip");
 
             log.info("> " + post.getRequestLine());
             try(CloseableHttpResponse response = httpClient.execute(post)) {
