@@ -43,7 +43,7 @@ public class SyncJobState implements Serializable {
     public static final String STATE_WAITING = "waiting";
     public static final String STATE_SCHEDULED = "scheduled";
     public static final String STATE_STARTED = "started";
-    public static final String STATE_RETRYING = "retrying";
+    public static final String STATE_RETRY = "retry";
     public static final String STATE_COMPLETED = "completed";
     public static final String STATE_ERROR = "error";
 
@@ -60,6 +60,8 @@ public class SyncJobState implements Serializable {
     private Date fileListDate;
 
     private boolean fileListHashed;
+
+    private int failedTries;
 
     // <editor-fold defaultstate="collapsed" desc="getters and setters">
     public Date getLastRun() {
@@ -117,6 +119,14 @@ public class SyncJobState implements Serializable {
     public void setFileListHashed(boolean fileListHashed) {
         this.fileListHashed = fileListHashed;
     }
+
+    public int getFailedTries() {
+        return failedTries;
+    }
+
+    public void setFailedTries(int failedTries) {
+        this.failedTries = failedTries;
+    }
     // </editor-fold>
 
     public static void writeCachedFileList(String name, List<FileRecord> fileList) throws IOException {
@@ -159,9 +169,9 @@ public class SyncJobState implements Serializable {
         SyncJobStatePersistence.persist();
     }
 
-    void endRun(boolean success) {
+    void endRun(String state) {
         setLastFinished(new Date());
-        setCurrentState(success ? STATE_COMPLETED : STATE_ERROR);
+        setCurrentState(state);
 
         SyncJobStatePersistence.persist();
     }

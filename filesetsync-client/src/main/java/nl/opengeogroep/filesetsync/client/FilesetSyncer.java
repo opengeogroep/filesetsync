@@ -33,6 +33,7 @@ import nl.opengeogroep.filesetsync.FileRecord;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_FILE;
 import nl.opengeogroep.filesetsync.FileRecordListDirectoryIterator;
+import static nl.opengeogroep.filesetsync.client.SyncJobState.*;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import nl.opengeogroep.filesetsync.client.util.HttpClientUtil;
@@ -119,12 +120,17 @@ public class FilesetSyncer {
             setDirectoriesLastModified();
 
             log.info("Sync job complete");
-            state.endRun(true);
-        } catch(Exception e) {
-            // TODO: set retry status
+            state.endRun(STATE_COMPLETED);
+        } catch(IOException e) {
+            state.setFailedTries(state.getFailedTries()+1);
 
-            log.error("Sync job encountered exception", e);
-            state.endRun(false);
+            if(state.getFailedTries() >= fs.getMaxTries()) {
+                log.error("Retryable IOException but max tries reached after " + state.getFailedTries() + " times, job disabled until restart", e);
+                state.endRun(STATE_ERROR);
+            } else {
+                log.error(String.format("IO exception, retrying later after %d minutes (%d tries)", fs.getRetryWaitTime(), state.getFailedTries()), e);
+                state.endRun(STATE_RETRY);
+            }
         }
     }
 
@@ -160,6 +166,7 @@ public class FilesetSyncer {
             ResponseHandler<List<FileRecord>> rh = new ResponseHandler<List<FileRecord>>() {
                 @Override
                 public List handleResponse(HttpResponse hr) throws ClientProtocolException, IOException {
+                    log.info("< " + hr.getStatusLine());
 
                     int status = hr.getStatusLine().getStatusCode();
                     if(status == SC_NOT_MODIFIED) {
@@ -179,6 +186,7 @@ public class FilesetSyncer {
                 }
             };
 
+            log.info("> " + get.getRequestLine());
             fileList = httpClient.execute(get, rh);
 
             if(fileList == null) {
@@ -199,6 +207,7 @@ public class FilesetSyncer {
                 if(lastModified != -1) {
                     state.setFileListRemotePath(fs.getRemote());
                     state.setFileListDate(new Date(lastModified));
+                    state.setFileListHashed(fs.isHash());
                     SyncJobState.writeCachedFileList(fs.getName(), fileList);
                     SyncJobStatePersistence.persist();
                 }
@@ -395,9 +404,9 @@ public class FilesetSyncer {
             post.setEntity(new ByteArrayEntity(b.toByteArray()));
             post.setHeader(HttpHeaders.CONTENT_TYPE, Protocol.FILELIST_MIME_TYPE);
 
-            log.info("Request: " + post.getRequestLine());
+            log.info("> " + post.getRequestLine());
             try(CloseableHttpResponse response = httpClient.execute(post)) {
-                log.info("Response: " + response.getStatusLine());
+                log.info("< " + response.getStatusLine());
 
                 int status = response.getStatusLine().getStatusCode();
                 if(status < 200 || status >= 300) {

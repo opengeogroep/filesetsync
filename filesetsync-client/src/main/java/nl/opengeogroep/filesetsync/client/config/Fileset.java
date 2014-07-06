@@ -101,6 +101,18 @@ public class Fileset implements Comparable {
     private String local;
 
     /**
+     * Maximum number of tries after a RetryableIOException is caught.
+     */
+    @XmlElement
+    private int maxTries = 5;
+
+    /**
+     * Alternate retry wait time in minutes.
+     */
+    @XmlElement
+    private int retryWaitTime = 1;
+
+    /**
      * Properties for this fileset.
      */
     @XmlElementWrapper(name="properties")
@@ -178,6 +190,22 @@ public class Fileset implements Comparable {
 
     public void setLocal(String local) {
         this.local = local;
+    }
+
+    public int getMaxTries() {
+        return maxTries;
+    }
+
+    public void setMaxTries(int maxTries) {
+        this.maxTries = maxTries;
+    }
+
+    public int getRetryWaitTime() {
+        return retryWaitTime;
+    }
+
+    public void setRetryWaitTime(int retryWaitTime) {
+        this.retryWaitTime = retryWaitTime;
     }
 
     public List<Property> getProperties() {
