@@ -405,17 +405,24 @@ public class FilesetSyncer {
 
         int index = 0;
         int endIndex;
+        String regexp = fs.getRegexp();
         do {
             int thisChunkSize = 0;
+            List<FileRecord> chunkList = new ArrayList();
             endIndex = fileList.size()-1;
             for(int j = index; j < fileList.size(); j++) {
+                if(regexp != null) {
+                    if(!fileList.get(j).getName().matches(regexp)) {
+                        continue;
+                    }
+                }
+                chunkList.add(fileList.get(j));
                 thisChunkSize += fileList.get(j).getSize();
                 if(thisChunkSize >= chunkSize) {
                     endIndex = j;
                     break;
                 }
             }
-            List<FileRecord> chunkList = fileList.subList(index, endIndex+1);
             log.info(String.format("Requesting chunk of %d files (size %.0f KB)", chunkList.size(), thisChunkSize/1024.0));
             if(log.isTraceEnabled()) {
                 int t = 0;

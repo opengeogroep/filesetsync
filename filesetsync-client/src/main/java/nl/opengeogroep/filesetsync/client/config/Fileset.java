@@ -87,6 +87,13 @@ public class Fileset {
     private String remote;
 
     /**
+     * Only transfer files matching this regular expression. Note that files
+     * are still deleted for the entire path.
+     */
+    @XmlElement
+    private String regexp;
+
+    /**
      * Local path to save downloaded files to or upload them from. Either a
      * directory (meaning recursive) or a single file name.
      */
@@ -167,6 +174,14 @@ public class Fileset {
 
     public void setRemote(String remote) {
         this.remote = remote;
+    }
+
+    public String getRegexp() {
+        return regexp;
+    }
+
+    public void setRegexp(String regexp) {
+        this.regexp = regexp;
     }
 
     public String getLocal() {
