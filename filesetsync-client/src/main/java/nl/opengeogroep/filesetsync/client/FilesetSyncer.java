@@ -89,7 +89,7 @@ public class FilesetSyncer {
 
     final private List<Pair<File,Long>> directoriesLastModifiedTimes = new ArrayList();
 
-    final private Map<String,String> localFilesByHash = new HashMap();
+    //final private Map<String,String> localFilesByHash = new HashMap();
 
     private boolean filesUpdated;
 
@@ -346,7 +346,7 @@ public class FilesetSyncer {
                 if(fs.isHash()) {
                     try {
                         String hash = FileRecord.calculateHash(localFile, hashTime);
-                        localFilesByHash.put(hash, localFile.getCanonicalPath());
+                        //localFilesByHash.put(hash, localFile.getCanonicalPath());
                         hashBytes += localFile.length();
                         if(hash.equals(fr.getHash())) {
                             log.trace("Same hash for " + fr.getName());
