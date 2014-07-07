@@ -217,6 +217,15 @@ public class Fileset {
     }
     // </editor-fold>
 
+    public String getProperty(String name) {
+        for(Property p: properties) {
+            if(p.getName().equals(name)) {
+                return p.getValue();
+            }
+        }
+        return null;
+    }
+
     @Override
     public String toString() {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.MULTI_LINE_STYLE);

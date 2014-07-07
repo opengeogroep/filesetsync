@@ -91,6 +91,8 @@ public class FilesetSyncer {
 
     final private Map<String,String> localFilesByHash = new HashMap();
 
+    private boolean filesUpdated;
+
     public FilesetSyncer(Fileset fs) {
         SyncJobStatePersistence.setCurrentFileset(fs);
         this.fs = fs;
@@ -133,6 +135,14 @@ public class FilesetSyncer {
 
             log.info("Sync job complete");
             state.endRun(STATE_COMPLETED);
+
+            String exitCodeAfterUpdate = fs.getProperty("exitCodeAfterUpdate");
+            if(exitCodeAfterUpdate != null && filesUpdated) {
+                int code = Integer.parseInt(exitCodeAfterUpdate);
+                log.info("Files were updated, exiting with exit code " + code);
+                SyncJobStatePersistence.persist();
+                System.exit(code);
+            }
         } catch(IOException e) {
             state.setFailedTries(state.getFailedTries()+1);
 
@@ -316,7 +326,6 @@ public class FilesetSyncer {
             File localFile;
             if(fileList.size() == 1 && fr.getType() == TYPE_FILE) {
                 localFile = new File(fs.getLocal());
-                localFile.getParentFile().mkdirs();
             } else {
                 localFile = new File(fs.getLocal() + File.separator + fr.getName());
             }
@@ -523,6 +532,7 @@ public class FilesetSyncer {
                         try(FileOutputStream out = new FileOutputStream(local)) {
                             IOUtils.copy(mfh.getBody(), out);
                             totalBytes += mfh.getContentLength();
+                            filesUpdated = true;
                         } catch(IOException e) {
                             log.error(String.format("Error writing to local file \"%s\": %s", fs.getLocal(), ExceptionUtils.getMessage(e)));
                             throw e;
