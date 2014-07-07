@@ -29,6 +29,7 @@ import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
@@ -38,6 +39,7 @@ import org.apache.commons.io.filefilter.FileFileFilter;
 import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.mutable.MutableLong;
 
 /**
@@ -100,7 +102,7 @@ public class FileRecord implements Serializable {
      * Return an Iterable of FileRecords in this fileset recursing into
      * directories. The resulting FileRecords have no hash calculated.
      */
-    public static Iterable<FileRecord> getFileRecordsInDir(String path) throws IOException {
+    public static Iterable<FileRecord> getFileRecordsInDir(final String path, final String regexp, final MutableInt noRegexpMatches) throws IOException {
         final File f = new File(path);
         if(f.isFile()) {
             return Arrays.asList(new FileRecord(f, "."));
@@ -108,7 +110,7 @@ public class FileRecord implements Serializable {
             return new Iterable<FileRecord>() {
                 @Override
                 public Iterator<FileRecord> iterator() {
-                    return new FileRecordIterator(f);
+                    return new FileRecordIterator(f, regexp, noRegexpMatches);
                 }
             };
         }
@@ -117,27 +119,54 @@ public class FileRecord implements Serializable {
     public static class FileRecordIterator implements Iterator<FileRecord> {
         private final String rootPath;
         private final Iterator<File> it;
+        private final String regexp;
+        private final MutableInt noRegexpMatches;
 
-        public FileRecordIterator(File startDir) {
+        private FileRecord next;
+
+        public FileRecordIterator(File startDir, String regexp, MutableInt noRegexpMatches) {
             this.rootPath = startDir.getAbsolutePath();
+            this.regexp = regexp;
+            this.noRegexpMatches = noRegexpMatches;
             it = FileUtils.iterateFilesAndDirs(startDir, new AndFileFilter(FileFileFilter.FILE, CanReadFileFilter.CAN_READ), TrueFileFilter.INSTANCE);
         }
 
         @Override
         public FileRecord next() {
-            File f = it.next();
-            String absolutePath = f.getAbsolutePath();
-            if(absolutePath.equals(rootPath)) {
-                // Root directory, set "." as relative name
-                return new FileRecord(f, ".");
-            } else {
-                return new FileRecord(f, absolutePath.substring(rootPath.length()+1));
+            if(!hasNext()) {
+                throw new NoSuchElementException();
             }
+            FileRecord r = next;
+            next = null;
+            return r;
         }
 
         @Override
         public boolean hasNext() {
-            return it.hasNext();
+            if(next != null) {
+                return true;
+            }
+            while(it.hasNext()) {
+                File f = it.next();
+                String absolutePath = f.getAbsolutePath();
+                if(absolutePath.equals(rootPath)) {
+                    // Root directory, set "." as relative name
+                    next = new FileRecord(f, ".");
+                    return true;
+                } else {
+                    String sub = absolutePath.substring(rootPath.length()+1);
+                    if(regexp == null || sub.matches(regexp)) {
+                        next = new FileRecord(f, sub);
+                        return true;
+                    } else {
+                        if(regexp != null) {
+                            noRegexpMatches.increment();
+                        }
+                    }
+                }
+            }
+
+            return false;
         }
 
         @Override

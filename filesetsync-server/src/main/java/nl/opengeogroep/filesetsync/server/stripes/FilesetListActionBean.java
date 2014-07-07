@@ -41,6 +41,7 @@ import nl.opengeogroep.filesetsync.server.ServerFileset;
 import static nl.opengeogroep.filesetsync.util.FormatUtil.dateToString;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.mutable.MutableLong;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.logging.Log;
@@ -59,6 +60,9 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
     @Validate
     private boolean hash = false;
 
+    @Validate
+    private String regexp;
+
     @Override
     protected final String getLogName() {
         return "api.list";
@@ -70,6 +74,14 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
 
     public void setHash(boolean hash) {
         this.hash = hash;
+    }
+
+    public String getRegexp() {
+        return regexp;
+    }
+
+    public void setRegexp(String regexp) {
+        this.regexp = regexp;
     }
 
     private class FilesetListingResolution extends StreamingResolution {
@@ -180,6 +192,8 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
 
         final ServerFileset theFileset = getFileset();
 
+        MutableInt noRegexpMatches = new MutableInt();
+
         long ifModifiedSince = getContext().getRequest().getDateHeader("If-Modified-Since");
 
         if(ifModifiedSince == -1) {
@@ -187,7 +201,7 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
             // Stream file records directly to output without buffering all
             // records in memory
             // return new FilesetListingResolution(ServerFileset.getFileRecordsInDir(getLocalSubPath());
-            return new FilesetListingResolution(theFileset, FileRecord.getFileRecordsInDir(getLocalSubPath()));
+            return new FilesetListingResolution(theFileset, FileRecord.getFileRecordsInDir(getLocalSubPath(), regexp, noRegexpMatches));
         } else {
             // A conditional HTTP request with If-Modified-Since is checked
             // against the latest last modified date of all the files and
@@ -207,14 +221,16 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
             String cacheDir = new File(FileHashCache.getCacheDir(theFileset.getName())).getCanonicalPath();
 
             log.info("traverse " + getLocalSubPath());
+
             long startTime = System.currentTimeMillis();
-            for(FileRecord fr: FileRecord.getFileRecordsInDir(getLocalSubPath())) {
+            for(FileRecord fr: FileRecord.getFileRecordsInDir(getLocalSubPath(), regexp, noRegexpMatches)) {
                 if(fr.getFile().getCanonicalPath().startsWith(cacheDir)) {
                     continue;
                 }
                 fileRecords.add(fr);
                 lastModified = Math.max(lastModified, fr.getLastModified());
             }
+            log.info(String.format("traversed %d files and dirs%s", fileRecords.size(), regexp == null ? "" : ", filtered " + noRegexpMatches + " by regexp"));
             String time = DurationFormatUtils.formatDurationWords(System.currentTimeMillis() - startTime, true, false);
             if(ifModifiedSince >= lastModified) {
                 log.info("not modified since " + dateToString(new Date(lastModified)) + ", took " + time);

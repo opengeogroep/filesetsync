@@ -37,6 +37,7 @@ import nl.opengeogroep.filesetsync.protocol.Protocol;
 import static nl.opengeogroep.filesetsync.protocol.Protocol.FILELIST_MIME_TYPE;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CountingOutputStream;
+import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -107,7 +108,7 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
             }
 
             log.info("recursively streaming " + getLocalSubPath());
-            filesToStream = FileRecord.getFileRecordsInDir(getLocalSubPath());
+            filesToStream = FileRecord.getFileRecordsInDir(getLocalSubPath(), null, new MutableInt());
         }
 
         return new MultiFileStreamingResolution(filesToStream);

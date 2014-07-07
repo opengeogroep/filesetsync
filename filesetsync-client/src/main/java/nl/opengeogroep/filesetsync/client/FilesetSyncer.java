@@ -182,6 +182,7 @@ public class FilesetSyncer {
             HttpUriRequest get = RequestBuilder.get()
                     .setUri(serverUrl + "list/" + fs.getRemote())
                     .addParameter("hash", fs.isHash() + "")
+                    .addParameter("regexp", fs.getRegexp())
                     .build();
             if(cachedFileList) {
                 get.addHeader(HttpHeaders.IF_MODIFIED_SINCE, HttpUtil.formatDate(state.getFileListDate()));
@@ -248,6 +249,12 @@ public class FilesetSyncer {
 
     private void deleteLocalFiles() {
         if(Shutdown.isHappening()) {
+            return;
+        }
+
+        if(fs.getRegexp() != null) {
+            // XXX only delete local files matching regexp, for now don't delete
+            // anything
             return;
         }
 
@@ -414,17 +421,18 @@ public class FilesetSyncer {
 
         int index = 0;
         int endIndex;
-        String regexp = fs.getRegexp();
+        //String regexp = fs.getRegexp();
         do {
             int thisChunkSize = 0;
             List<FileRecord> chunkList = new ArrayList();
             endIndex = fileList.size()-1;
             for(int j = index; j < fileList.size(); j++) {
-                if(regexp != null) {
-                    if(!fileList.get(j).getName().matches(regexp)) {
-                        continue;
-                    }
-                }
+                //if(regexp != null) {
+                    // Should always match if server applied regexp
+                    //if(!fileList.get(j).getName().matches(regexp)) {
+                    //    continue;
+                    //}
+                //}
                 chunkList.add(fileList.get(j));
                 thisChunkSize += fileList.get(j).getSize();
                 if(thisChunkSize >= chunkSize) {
@@ -461,6 +469,8 @@ public class FilesetSyncer {
     }
 
     private void transferChunk(List<FileRecord> chunkList) throws IOException {
+        boolean verbose = "true".equals(fs.getProperty("verbose"));
+
         try(CloseableHttpClient httpClient = HttpClientUtil.get()) {
             HttpPost post = new HttpPost(serverUrl + "get/" + fs.getRemote());
 
@@ -517,16 +527,22 @@ public class FilesetSyncer {
                             if(local.exists() && local.isDirectory()) {
                                 continue;
                             }
-                            log.info("mkdir     " + mfh.getFilename());
+                            if(verbose) {
+                                log.info("mkdir     " + mfh.getFilename());
+                            }
                             local.mkdirs();
                             directoriesLastModifiedTimes.add(Pair.of(local, mfh.getLastModified().getTime()));
                             continue;
                         }
 
                         if(local.exists()) {
-                            log.info("overwrite " + mfh.getFilename());
+                            if(verbose) {
+                                log.info("overwrite " + mfh.getFilename());
+                            }
                         } else {
-                            log.info("write     " + mfh.getFilename());
+                            if(verbose) {
+                                log.info("write     " + mfh.getFilename());
+                            }
                             local.getParentFile().mkdirs();
                         }
                         try(FileOutputStream out = new FileOutputStream(local)) {
