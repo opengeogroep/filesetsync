@@ -518,6 +518,7 @@ public class FilesetSyncer {
                             log.info("overwrite " + mfh.getFilename());
                         } else {
                             log.info("write     " + mfh.getFilename());
+                            local.getParentFile().mkdirs();
                         }
                         try(FileOutputStream out = new FileOutputStream(local)) {
                             IOUtils.copy(mfh.getBody(), out);
