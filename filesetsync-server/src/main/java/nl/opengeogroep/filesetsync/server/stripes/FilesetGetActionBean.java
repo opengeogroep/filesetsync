@@ -153,7 +153,10 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
                     }
                 }
             } finally {
-                IOUtils.closeQuietly(streamer);
+                try {
+                    streamer.close();
+                } catch(IOException e) {
+                }
                 IOUtils.closeQuietly(uncompressedCounter);
 
                 long compressedBytes = compressedCounter.getByteCount();
