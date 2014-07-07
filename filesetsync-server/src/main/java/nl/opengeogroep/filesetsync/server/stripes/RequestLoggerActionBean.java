@@ -52,7 +52,9 @@ public abstract class RequestLoggerActionBean implements ActionBean {
     public void setMDCHeaders() {
         MDC.clear();
         HttpServletRequest r = context.getRequest();
-        MDC.put("request.remoteAddr", r.getRemoteAddr());
+
+        String forwardedFor = r.getHeader("X-Forwarded-For");
+        MDC.put("request.remoteAddr", forwardedFor != null ? forwardedFor : r.getRemoteAddr());
 
         String s = context.getServletContext().getInitParameter("logHeaders");
         if(StringUtils.isNotBlank(s)) {
