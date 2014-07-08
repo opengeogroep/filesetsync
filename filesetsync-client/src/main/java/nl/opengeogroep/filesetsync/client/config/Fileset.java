@@ -110,7 +110,7 @@ public class Fileset {
      * Alternate retry wait time in seconds.
      */
     @XmlElement
-    private int retryWaitTime = 1;
+    private int retryWaitTime = 30;
 
     /**
      * Properties for this fileset.
