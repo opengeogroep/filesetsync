@@ -78,17 +78,19 @@ public class FilesetSyncer {
 
     private String serverUrl;
 
-    List<FileRecord> fileList;
+    private List<FileRecord> fileList;
 
-    long totalBytes;
+    private long totalBytes;
 
-    String localCanonicalPath;
+    private String localCanonicalPath;
 
-    final private List<Pair<File,Long>> directoriesLastModifiedTimes = new ArrayList();
+    private final List<Pair<File,Long>> directoriesLastModifiedTimes = new ArrayList();
 
     //final private Map<String,String> localFilesByHash = new HashMap();
 
     private boolean filesUpdated;
+
+    private int alreadyLocal;
 
     public FilesetSyncer(Fileset fs) {
         SyncJobStatePersistence.setCurrentFileset(fs);
@@ -316,8 +318,6 @@ public class FilesetSyncer {
      */
     private void compareFilesetList() throws IOException {
 
-        List<FileRecord> alreadyLocal = new ArrayList();
-
         MutableLong hashTime = new MutableLong();
         long hashBytes = 0;
         long startTime = System.currentTimeMillis();
@@ -325,7 +325,8 @@ public class FilesetSyncer {
         int processed = 0;
         int newerLocalFiles = 0;
 
-        for(FileRecord fr: fileList) {
+        for(int index = 0; index < fileList.size(); index++) {
+            FileRecord fr = fileList.get(index);
             if(Shutdown.isHappening()) {
                 return;
             }
@@ -344,7 +345,7 @@ public class FilesetSyncer {
                     log.trace(String.format("later updating last modified for directory %s", localFile.getCanonicalPath()));
                     directoriesLastModifiedTimes.add(Pair.of(localFile, fr.getLastModified()));
                 }
-                alreadyLocal.add(fr);
+                fileList.set(index, null); alreadyLocal++;
             }
             if(fr.getType() == TYPE_FILE && localFile.exists()) {
                 if(!localFile.isFile()) {
@@ -365,7 +366,7 @@ public class FilesetSyncer {
                                 }
                                 localFile.setLastModified(fr.getLastModified());
                             }
-                            alreadyLocal.add(fr);
+                            fileList.set(index, null); alreadyLocal++;
                         } else {
                             if(log.isTraceEnabled()) {
                                 log.trace("Hash mismatch for " + fr.getName());
@@ -384,12 +385,12 @@ public class FilesetSyncer {
                             log.trace(String.format("Keeping local file last modified at %s, later than remote file at %s: ", dateToString(new Date(localFile.lastModified())), dateToString(new Date(fr.getLastModified())), fr.getName()));
                         }
                         newerLocalFiles++;
-                        alreadyLocal.add(fr);
+                        fileList.set(index, null); alreadyLocal++;
                     } else {
                         if(log.isTraceEnabled()) {
                             log.trace("Local file unmodified: " + fr.getName());
                         }
-                        alreadyLocal.add(fr);
+                        fileList.set(index, null); alreadyLocal++;
                     }
                 }
             }
@@ -415,12 +416,11 @@ public class FilesetSyncer {
         }
         log.info(String.format("Compared file list to local files in %s, %d files up-to-date%s",
                 DurationFormatUtils.formatDurationWords(System.currentTimeMillis() - startTime, true, false),
-                alreadyLocal.size(),
+                alreadyLocal,
                 hashInfo));
         if(newerLocalFiles != 0) {
             log.warn(String.format("Not overwriting %d local files with newer local last modified date compared to files on server", newerLocalFiles));
         }
-        fileList.removeAll(alreadyLocal);
     }
 
     private void transferFiles() throws IOException {
@@ -428,12 +428,13 @@ public class FilesetSyncer {
             return;
         }
 
-        if(fileList.isEmpty()) {
+        int fileCount = fileList.size() - alreadyLocal;
+        if(fileCount == 0) {
             log.info("No files to transfer");
             return;
         }
 
-        action(String.format("Transferring %d files", fileList.size()));
+        action(String.format("Transferring %d files", fileCount));
 
         // A "chunk" here means a set of multiple files not smaller than the
         // configured chunk size (unless there are no more files)
@@ -450,14 +451,18 @@ public class FilesetSyncer {
             List<FileRecord> chunkList = new ArrayList();
             endIndex = fileList.size()-1;
             for(int j = index; j < fileList.size(); j++) {
+                FileRecord fr = fileList.get(j);
+                if(fr == null) {
+                    continue;
+                }
                 //if(regexp != null) {
                     // Should always match if server applied regexp
                     //if(!fileList.get(j).getName().matches(regexp)) {
                     //    continue;
                     //}
                 //}
-                chunkList.add(fileList.get(j));
-                thisChunkSize += fileList.get(j).getSize();
+                chunkList.add(fr);
+                thisChunkSize += fr.getSize();
                 if(thisChunkSize >= chunkSize) {
                     endIndex = j;
                     break;
