@@ -25,10 +25,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.zip.GZIPOutputStream;
 import nl.opengeogroep.filesetsync.FileRecord;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
@@ -47,7 +45,6 @@ import static nl.opengeogroep.filesetsync.util.FormatUtil.*;
 import nl.opengeogroep.filesetsync.util.HttpUtil;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.mutable.MutableLong;
 import org.apache.commons.lang3.time.DurationFormatUtils;
@@ -152,7 +149,7 @@ public class FilesetSyncer {
                 log.error("Retryable IOException but max tries reached after " + state.getFailedTries() + " times, fatal error");
                 state.endRun(STATE_ERROR);
             } else {
-                log.error(String.format("IO exception, retrying later after %d minutes (try %d of max %d)", fs.getRetryWaitTime(), state.getFailedTries(), fs.getMaxTries()));
+                log.error(String.format("IO exception, retrying later after %d seconds (try %d of max %d)", fs.getRetryWaitTime(), state.getFailedTries(), fs.getMaxTries()));
                 state.endRun(STATE_RETRY);
             }
         } finally {
@@ -324,6 +321,9 @@ public class FilesetSyncer {
         MutableLong hashTime = new MutableLong();
         long hashBytes = 0;
         long startTime = System.currentTimeMillis();
+        long progressTime = startTime;
+        int processed = 0;
+        int newerLocalFiles = 0;
 
         for(FileRecord fr: fileList) {
             if(Shutdown.isHappening()) {
@@ -356,29 +356,49 @@ public class FilesetSyncer {
                         //localFilesByHash.put(hash, localFile.getCanonicalPath());
                         hashBytes += localFile.length();
                         if(hash.equals(fr.getHash())) {
-                            log.trace("Same hash for " + fr.getName());
+                            if(log.isTraceEnabled()) {
+                                log.trace("Same hash for " + fr.getName());
+                            }
                             if(fr.getLastModified() > localFile.lastModified()) {
-                                log.trace("Same hash, updating last modified for " + fr.getName());
+                                if(log.isTraceEnabled()) {
+                                    log.trace("Same hash, updating last modified for " + fr.getName());
+                                }
                                 localFile.setLastModified(fr.getLastModified());
                             }
                             alreadyLocal.add(fr);
                         } else {
-                            log.trace("Hash mismatch for " + fr.getName());
+                            if(log.isTraceEnabled()) {
+                                log.trace("Hash mismatch for " + fr.getName());
+                            }
                         }
                     } catch(Exception e) {
                         log.error("Error hashing " + localFile.getCanonicalPath() + ": " + ExceptionUtils.getMessage(e));
                     }
                 } else {
                     if(fr.getLastModified() > localFile.lastModified()) {
-                        log.trace("Remote file newer: " + fr.getName());
+                        if(log.isTraceEnabled()) {
+                            log.trace("Remote file newer: " + fr.getName());
+                        }
                     } else if(fr.getLastModified() < localFile.lastModified()) {
-                        log.warn(String.format("Keeping local file last modified at %s, later than remote file at %s: ", dateToString(new Date(localFile.lastModified())), dateToString(new Date(fr.getLastModified())), fr.getName()));
+                        if(log.isTraceEnabled()) {
+                            log.trace(String.format("Keeping local file last modified at %s, later than remote file at %s: ", dateToString(new Date(localFile.lastModified())), dateToString(new Date(fr.getLastModified())), fr.getName()));
+                        }
+                        newerLocalFiles++;
                         alreadyLocal.add(fr);
                     } else {
-                        log.trace("Local file unmodified: " + fr.getName());
+                        if(log.isTraceEnabled()) {
+                            log.trace("Local file unmodified: " + fr.getName());
+                        }
                         alreadyLocal.add(fr);
                     }
                 }
+            }
+
+            processed++;
+            long time = System.currentTimeMillis();
+            if(time - progressTime > 30000) {
+                log.info(String.format("Still comparing files, processed %d files", processed));
+                progressTime = time;
             }
         }
 
@@ -397,6 +417,9 @@ public class FilesetSyncer {
                 DurationFormatUtils.formatDurationWords(System.currentTimeMillis() - startTime, true, false),
                 alreadyLocal.size(),
                 hashInfo));
+        if(newerLocalFiles != 0) {
+            log.warn(String.format("Not overwriting %d local files with newer local last modified date compared to files on server", newerLocalFiles));
+        }
         fileList.removeAll(alreadyLocal);
     }
 
