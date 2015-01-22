@@ -59,8 +59,10 @@ public abstract class RequestLoggerActionBean implements ActionBean {
         String s = context.getServletContext().getInitParameter("logHeaders");
         if(StringUtils.isNotBlank(s)) {
             for(String header: s.split(",")) {
-                log.debug(String.format("header %s: %s", header, r.getHeader(header)));
-                MDC.put("request.header." + header.toLowerCase(), r.getHeader(header));
+                String value = r.getHeader(header);
+                if(value != null) {
+                    MDC.put("request.header." + header.toLowerCase(), value);
+                }
             }
         }
         StringBuffer url = r.getRequestURL();
