@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
@@ -35,6 +36,7 @@ import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import nl.opengeogroep.filesetsync.protocol.BufferedFileListEncoder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.http.Header;
 
 /**
  * State about synchronizing a Fileset. Includes the file list cache.
@@ -65,6 +67,8 @@ public class SyncJobState implements Serializable {
     private boolean fileListHashed;
 
     private transient int failedTries;
+
+    private transient List<Header> requestHeaders;
 
     // <editor-fold defaultstate="collapsed" desc="getters and setters">
     public Date getLastRun() {
@@ -129,6 +133,17 @@ public class SyncJobState implements Serializable {
 
     public void setFailedTries(int failedTries) {
         this.failedTries = failedTries;
+    }
+
+    public List<Header> getRequestHeaders() {
+        if(requestHeaders == null) {
+            requestHeaders = new ArrayList();
+        }
+        return requestHeaders;
+    }
+
+    public void setRequestHeaders(List<Header> requestHeaders) {
+        this.requestHeaders = requestHeaders;
     }
     // </editor-fold>
 

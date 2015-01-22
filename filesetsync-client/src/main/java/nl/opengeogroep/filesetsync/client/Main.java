@@ -10,8 +10,11 @@ import static javax.swing.JOptionPane.ERROR_MESSAGE;
 import static javax.swing.JOptionPane.showMessageDialog;
 import javax.swing.UIManager;
 import javax.xml.bind.JAXBException;
+import nl.opengeogroep.filesetsync.client.config.Plugin;
 import nl.opengeogroep.filesetsync.client.config.Property;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
+import nl.opengeogroep.filesetsync.client.plugin.api.PluginContext;
+import nl.opengeogroep.filesetsync.client.plugin.api.PluginInterface;
 import nl.opengeogroep.filesetsync.client.util.L10n;
 import nl.opengeogroep.filesetsync.client.util.Version;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -109,6 +112,48 @@ public final class Main {
         Runtime.getRuntime().addShutdownHook(new Shutdown());
 
         SyncJobStatePersistence.initialize();
+
+        PluginContext.initialize();
+
+        // Load plugins
+        for(Plugin plugin: SyncConfig.getInstance().getPlugins()) {
+            log.info("Loading plugin class " + plugin.getClazz());
+            Class c;
+            try {
+                c = Class.forName(plugin.getClazz());
+            } catch(Exception e) {
+                log.error("Exception loading plugin class " + plugin.getClazz(), e);
+                continue;
+            }
+            PluginInterface pluginInstance;
+            try {
+                pluginInstance = (PluginInterface)c.getConstructor().newInstance();
+            } catch(Exception e) {
+                log.error("Exception instantiating plugin class " + plugin.getClazz(), e);
+                continue;
+            }
+            props = new Properties();
+            for(Property p: plugin.getProperties()) {
+                if(p.getValue() != null) {
+                    props.setProperty(p.getName(), p.getValue().replace("${var}", SyncConfig.getInstance().getVarDir()));
+                }
+            }
+
+            if(log.isTraceEnabled()) {
+                sw = new StringWriter();
+                props.list(new PrintWriter(sw));
+                log.debug("Initializing plugin with properties " + sw.toString());
+            }
+            try {
+                pluginInstance.setPluginContext(PluginContext.getInstance());
+                pluginInstance.configure(props);
+            } catch(Exception e) {
+                sw = new StringWriter();
+                props.list(new PrintWriter(sw));
+                log.error("Error configuring plugin of class " + plugin.getClazz() + " with properties " + sw.toString(), e);
+            }
+        }
+
         SyncRunner.getInstance().start();
     }
 }

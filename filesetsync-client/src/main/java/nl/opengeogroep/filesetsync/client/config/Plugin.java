@@ -17,9 +17,13 @@
 
 package nl.opengeogroep.filesetsync.client.config;
 
+import java.util.ArrayList;
+import java.util.List;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlElementWrapper;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
@@ -32,6 +36,13 @@ public class Plugin {
     @XmlAttribute(name="class", required=true)
     private String clazz;
 
+    /**
+     * Properties for this fileset.
+     */
+    @XmlElementWrapper(name="properties")
+    @XmlElement(name="property")
+    private List<Property> properties = new ArrayList();
+
     public String getClazz() {
         return clazz;
     }
@@ -39,7 +50,15 @@ public class Plugin {
     public void setClazz(String clazz) {
         this.clazz = clazz;
     }
-    
+
+    public List<Property> getProperties() {
+        return properties;
+    }
+
+    public void setProperties(List<Property> properties) {
+        this.properties = properties;
+    }
+
     @Override
     public String toString() {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SIMPLE_STYLE);

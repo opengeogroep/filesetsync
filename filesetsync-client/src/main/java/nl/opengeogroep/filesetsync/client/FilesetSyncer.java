@@ -35,6 +35,7 @@ import nl.opengeogroep.filesetsync.FileRecordListDirectoryIterator;
 import static nl.opengeogroep.filesetsync.client.SyncJobState.*;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
+import nl.opengeogroep.filesetsync.client.plugin.api.PluginContext;
 import nl.opengeogroep.filesetsync.client.util.HttpClientUtil;
 import nl.opengeogroep.filesetsync.protocol.BufferedFileListEncoder;
 import nl.opengeogroep.filesetsync.protocol.MultiFileDecoder;
@@ -51,6 +52,7 @@ import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
@@ -115,6 +117,7 @@ public class FilesetSyncer {
                 state.getLastFinished() == null ? "never" : "at " + dateToString(state.getLastFinished())));
         log.trace(fs);
 
+        PluginContext.getInstance().beforeStart(fs, state);
         state.startNewRun();
 
         serverUrl = fs.getServer();
@@ -164,6 +167,12 @@ public class FilesetSyncer {
         log.info(s);
     }
 
+    private void addExtraHeaders(HttpUriRequest r) {
+        for(Header h: state.getRequestHeaders()) {
+            r.addHeader(h);
+        }
+    }
+
     private void retrieveFilesetList() throws IOException {
 
         final boolean cachedFileList = state.getFileListDate() != null
@@ -186,6 +195,7 @@ public class FilesetSyncer {
             if(cachedFileList) {
                 get.addHeader(HttpHeaders.IF_MODIFIED_SINCE, HttpUtil.formatDate(state.getFileListDate()));
             }
+            addExtraHeaders(get);
             // Request poorly encoded text format
             get.addHeader(HttpHeaders.ACCEPT, "text/plain");
 
@@ -514,6 +524,7 @@ public class FilesetSyncer {
             post.setEntity(new ByteArrayEntity(b.toByteArray()));
             post.setHeader(HttpHeaders.CONTENT_TYPE, Protocol.FILELIST_MIME_TYPE);
             post.setHeader(HttpHeaders.CONTENT_ENCODING, "gzip");
+            addExtraHeaders(post);
 
             log.info("> " + post.getRequestLine());
             try(CloseableHttpResponse response = httpClient.execute(post)) {
