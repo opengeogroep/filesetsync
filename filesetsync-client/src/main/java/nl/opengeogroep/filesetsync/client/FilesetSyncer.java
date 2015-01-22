@@ -325,6 +325,8 @@ public class FilesetSyncer {
         int processed = 0;
         int newerLocalFiles = 0;
 
+        boolean setLastModifiedToServer = "true".equals(fs.getProperty("setLastModifiedToServer"));
+
         for(int index = 0; index < fileList.size(); index++) {
             FileRecord fr = fileList.get(index);
             if(Shutdown.isHappening()) {
@@ -381,8 +383,12 @@ public class FilesetSyncer {
                             log.trace("Remote file newer: " + fr.getName());
                         }
                     } else if(fr.getLastModified() < localFile.lastModified()) {
-                        if(log.isTraceEnabled()) {
-                            log.trace(String.format("Keeping local file last modified at %s, later than remote file at %s: ", dateToString(new Date(localFile.lastModified())), dateToString(new Date(fr.getLastModified())), fr.getName()));
+                        if(setLastModifiedToServer) {
+                            localFile.setLastModified(fr.getLastModified());
+                        } else {
+                            if(log.isTraceEnabled()) {
+                                log.trace(String.format("Keeping local file last modified at %s, later than remote file at %s: ", dateToString(new Date(localFile.lastModified())), dateToString(new Date(fr.getLastModified())), fr.getName()));
+                            }
                         }
                         newerLocalFiles++;
                         fileList.set(index, null); alreadyLocal++;
