@@ -56,6 +56,7 @@ import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
 import static org.apache.http.HttpStatus.*;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.ResponseHandler;
@@ -548,6 +549,14 @@ public class FilesetSyncer {
                         if(Shutdown.isHappening()) {
                             post.abort();
                             return;
+                        }
+
+                        if(mfh.getStatus() != HttpStatus.SC_OK) {
+                            log.warn(String.format("Server returned not OK status for file %s: %d %s",
+                                    mfh.getFilename(),
+                                    mfh.getStatus(),
+                                    mfh.getStatusLine()));
+                            continue;
                         }
 
                         log.trace(String.format("File #%3d: %8d bytes, %s, %s", ++i, mfh.getContentLength(), mfh.getContentType(), mfh.getFilename()));

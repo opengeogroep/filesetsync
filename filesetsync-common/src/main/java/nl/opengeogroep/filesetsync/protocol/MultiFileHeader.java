@@ -8,8 +8,6 @@ import java.text.ParseException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import static nl.opengeogroep.filesetsync.protocol.MultiFileEncoder.CONTENT_TYPE_DIRECTORY;
 import static nl.opengeogroep.filesetsync.protocol.MultiFileEncoder.HEADER_FILENAME;
 import nl.opengeogroep.filesetsync.util.HttpUtil;
@@ -24,7 +22,7 @@ public class MultiFileHeader {
     final int status;
     final String statusLine;
     final Map<String,String> headers = new HashMap();
-    
+
     final InputStream input;
 
     public MultiFileHeader(DataInputStream in) throws IOException {
@@ -39,16 +37,42 @@ public class MultiFileHeader {
             String value = in.readUTF();
             headers.put(header, value);
         }
-        
+
         input = new BoundedInputStream(in, getContentLength());
     }
 
-    public boolean isDirectory() {
-        return getContentType().equals(CONTENT_TYPE_DIRECTORY);
+    public int getStatus() {
+        return status;
     }
-    
-    public final long getContentLength() {
-        return Long.parseLong(headers.get(HttpHeaders.CONTENT_LENGTH));
+
+    public String getStatusLine() {
+        return statusLine;
+    }
+
+    private String getExceptionDetails() {
+        return String.format(" for file %s (status: %d %s)", getFilename(), status, statusLine);
+    }
+
+    public boolean isDirectory() throws IOException {
+        String contentType = getContentType();
+
+        if(contentType == null) {
+            throw new IOException(String.format("Missing content type header" + getExceptionDetails()));
+        }
+        return contentType.equals(CONTENT_TYPE_DIRECTORY);
+    }
+
+    public final long getContentLength() throws IOException {
+        String contentLength = headers.get(HttpHeaders.CONTENT_LENGTH);
+
+        if(contentLength == null) {
+            throw new IOException(String.format("No content length in header" + getExceptionDetails()));
+        }
+        try {
+            return Long.parseLong(contentLength);
+        } catch(NumberFormatException e) {
+            throw new IOException(String.format("Invalid content length header \"%s\"" + getExceptionDetails()));
+        }
     }
 
     public String getContentType() {
@@ -63,11 +87,11 @@ public class MultiFileHeader {
             return new Date();
         }
     }
-    
+
     public String getFilename() {
         return headers.get(HEADER_FILENAME);
     }
-    
+
     public InputStream getBody() {
         return input;
     }
