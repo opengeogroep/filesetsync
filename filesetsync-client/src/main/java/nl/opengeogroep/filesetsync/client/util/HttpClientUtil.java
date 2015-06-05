@@ -17,6 +17,7 @@
 
 package nl.opengeogroep.filesetsync.client.util;
 
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 
@@ -28,6 +29,12 @@ public class HttpClientUtil {
 
     public static CloseableHttpClient get() {
         return HttpClients.custom()
+                .setDefaultRequestConfig(RequestConfig.custom()
+                        .setConnectTimeout(15 * 1000)
+                        // The server may take a while to respond... wait 5 minutes
+                        .setSocketTimeout(300 * 1000)
+                        .build()
+                )
                 .setUserAgent(Version.getProperty("project.name") + "/" + Version.getProperty("project.version"))
                 .build();
     }
