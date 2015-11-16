@@ -41,6 +41,7 @@ public class Fileset {
     public static final String SCHEDULE_ONCE = "once";
     public static final String SCHEDULE_DAILY = "daily";
     public static final String SCHEDULE_HOURLY = "hourly";
+    public static final String SCHEDULE_WEEKLY = "weekly";
 
     /**
      * Name for identification.
@@ -59,6 +60,13 @@ public class Fileset {
      */
     @XmlElement(defaultValue=SCHEDULE_ONCE)
     private String schedule;
+
+    /**
+     * Priority: when another fileset with higher priority is scheduled to start
+     * this fileset should suspend.
+     */
+    @XmlElement
+    private int priority = 1;
 
     /**
      * One of &quot;download&quot; or &quot;upload&quot;.
@@ -142,6 +150,14 @@ public class Fileset {
 
     public void setSchedule(String schedule) {
         this.schedule = schedule;
+    }
+
+    public int getPriority() {
+        return priority;
+    }
+
+    public void setPriority(int priority) {
+        this.priority = priority;
     }
 
     public String getDirection() {

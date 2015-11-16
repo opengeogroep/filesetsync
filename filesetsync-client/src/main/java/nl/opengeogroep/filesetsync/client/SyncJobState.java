@@ -202,8 +202,12 @@ public class SyncJobState implements Serializable {
             c.setTime(lastRun);
             if(Fileset.SCHEDULE_HOURLY.equals(fs.getSchedule())) {
                 c.add(Calendar.HOUR_OF_DAY, 1);
-            } else {
+            } else if(Fileset.SCHEDULE_DAILY.equals(fs.getSchedule())) {
                 c.add(Calendar.DAY_OF_YEAR, 1);
+            } else if(Fileset.SCHEDULE_WEEKLY.equals(fs.getSchedule())) {
+                c.add(Calendar.WEEK_OF_YEAR, 1);
+            } else {
+                throw new IllegalArgumentException("Invalid schedule: " + fs.getSchedule());
             }
             return c.getTime();
         }
