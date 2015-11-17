@@ -48,6 +48,7 @@ public class SyncJobState implements Serializable {
     public static final String STATE_WAITING = "waiting";
     public static final String STATE_SCHEDULED = "scheduled";
     public static final String STATE_STARTED = "started";
+    public static final String STATE_SUSPENDED = "suspended";
     public static final String STATE_RETRY = "retry";
     public static final String STATE_COMPLETED = "completed";
     public static final String STATE_ERROR = "error";
@@ -195,7 +196,7 @@ public class SyncJobState implements Serializable {
     }
 
     public Date calculateNextRunDate(Fileset fs) {
-        if(lastRun == null) {
+        if(lastRun == null || STATE_SUSPENDED.equals(currentState)) {
             return null;
         } else {
             Calendar c = GregorianCalendar.getInstance();

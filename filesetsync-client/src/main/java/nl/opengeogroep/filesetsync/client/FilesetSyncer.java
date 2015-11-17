@@ -77,6 +77,8 @@ public class FilesetSyncer {
 
     private final SyncJobState state;
 
+    private Date endTime;
+
     private final Fileset fs;
 
     private String serverUrl;
@@ -95,9 +97,10 @@ public class FilesetSyncer {
 
     private int alreadyLocal;
 
-    public FilesetSyncer(Fileset fs) {
+    public FilesetSyncer(Fileset fs, Date endTime) {
         SyncJobStatePersistence.setCurrentFileset(fs);
         this.fs = fs;
+        this.endTime = endTime;
         try {
             localCanonicalPath = new File(fs.getLocal()).getCanonicalPath();
         } catch(IOException e) {

@@ -18,7 +18,6 @@
 package nl.opengeogroep.filesetsync.client;
 
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import static javax.swing.JOptionPane.showMessageDialog;
 import static nl.opengeogroep.filesetsync.client.SyncJobState.*;
@@ -85,6 +84,8 @@ public class SyncRunner extends Thread {
     private void doRunOnceJobs() {
         // Iterator is in order of highest priority first
 
+        // TODO: in priority order
+
         // Do all filesets with schedule set to 'once' first, including retries
         for(Fileset fs: config.getFilesets()) {
             if(!Fileset.SCHEDULE_ONCE.equals(fs.getSchedule())) {
@@ -93,13 +94,13 @@ public class SyncRunner extends Thread {
 
             SyncJobState state = SyncJobStatePersistence.getInstance().getState(fs.getName(), true);
             if(state.getCurrentState().equals(STATE_WAITING)) {
-                runJobWithRetries(fs, state);
+                runJobWithRetries(fs, null, state);
             }
         }
     }
 
-    private void runJobWithRetries(Fileset fs, SyncJobState state) {
-        new FilesetSyncer(fs).sync();
+    private void runJobWithRetries(Fileset fs, Date endTime, SyncJobState state) {
+        new FilesetSyncer(fs, endTime).sync();
 
         while(state.getCurrentState().equals(STATE_RETRY)) {
             // Max wait time is 60 minutes, minimum 0
@@ -115,64 +116,141 @@ public class SyncRunner extends Thread {
                 return;
             }
             log.info("Retrying job after waiting");
-            new FilesetSyncer(fs).sync();
+            new FilesetSyncer(fs, endTime).sync();
         }
     }
 
-    private void runScheduledJobWithRetries(Fileset fs, SyncJobState state) {
-        runJobWithRetries(fs, state);
+    private void runScheduledJobWithRetries(Fileset fs, Date endTime, SyncJobState state) {
+        runJobWithRetries(fs, endTime, state);
+
         boolean success = state.getCurrentState().equals(STATE_COMPLETED);
-        // Keep scheduled, also on error
-        state.setCurrentState(STATE_WAITING);
-        SyncJobStatePersistence.persist();
+        if(STATE_SUSPENDED.equals(state.getCurrentState())) {
+            SyncJobStatePersistence.persist();
+            log.info(String.format("Job \"%s\" suspended", fs.getName()));
+        } else {
+            // Keep scheduled, also on error
+            state.setCurrentState(STATE_WAITING);
+            SyncJobStatePersistence.persist();
+
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            log.info(String.format("Next run date for %s %s job \"%s\": %s",
+                    success ? "successfully completed" : "failed",
+                    fs.getSchedule(),
+                    fs.getName(),
+                    sdf.format(state.calculateNextRunDate(fs))));
+        }
+    }
+
+    private static class ScheduleInfo {
+        Fileset filesetToRun;
+        SyncJobState filesetToRunState;
+        Date startTime;
+        Date higherPriorityStartTime;
+        Fileset nextHigherPriorityFileset;
+    }
+
+    /**
+     * Find the with the earliest start date and the date when a higher priority
+     * fileset is scheduled, or if no filesets are to be started, the date for
+     * the earliest next run.
+     */
+    private ScheduleInfo getScheduleInfo() {
+        ScheduleInfo info = new ScheduleInfo();
+        Integer highestPriority = null;
+
+        for(Fileset fs: config.getFilesets()) {
+            if(Fileset.SCHEDULE_ONCE.equals(fs.getSchedule())) {
+                continue;
+            }
+            SyncJobState state = SyncJobStatePersistence.getInstance().getState(fs.getName(), true);
+            if(!(STATE_WAITING.equals(state.getCurrentState()) || STATE_SUSPENDED.equals(state.getCurrentState()))) {
+                continue;
+            }
+
+            // First fileset we're looking at, or higher priority than currently
+            // selected fileset?
+            if(highestPriority == null || fs.getPriority() > highestPriority) {
+                highestPriority = fs.getPriority();
+                info.filesetToRun = fs;
+                info.filesetToRunState = state;
+                info.startTime = state.calculateNextRunDate(fs);
+            } else if(fs.getPriority() == highestPriority) {
+                // next run date = null -> start immediately, same priority in
+                // filesets config order
+                if(info.startTime != null) {
+                    Date fsNextRun = state.calculateNextRunDate(fs);
+                    if(fsNextRun == null || fsNextRun.before(info.startTime)) {
+                        info.filesetToRun = fs;
+                        info.filesetToRunState = state;
+                        info.startTime = fsNextRun;
+                    }
+                }
+            } else if(info.startTime != null) {
+                // Lower priority can run if current job is not immediately
+                // scheduled and lower priority is immediately scheduled or
+                // before higher priority job
+                Date fsNextRun = state.calculateNextRunDate(fs);
+                if(fsNextRun == null || fsNextRun.before(info.startTime)) {
+                    info.filesetToRun = fs;
+                    info.filesetToRunState = state;
+                    info.startTime = fsNextRun;
+                }
+            }
+        }
+
+        if(info.filesetToRun == null) {
+            throw new IllegalStateException("No scheduled jobs, should have exited!");
+        }
+
+        // Find job with higher priority than fileset we are running, to determine
+        // end time for fileset to run
+        for(Fileset fs: config.getFilesets()) {
+            if(Fileset.SCHEDULE_ONCE.equals(fs.getSchedule())) {
+                continue;
+            }
+            SyncJobState state = SyncJobStatePersistence.getInstance().getState(fs.getName(), true);
+            if(!STATE_WAITING.equals(state.getCurrentState())) {
+                continue;
+            }
+
+            if(fs == info.filesetToRun) {
+                continue;
+            }
+
+            if(fs.getPriority() > info.filesetToRun.getPriority()) {
+                // Can only get here if calculated next run time is after start
+                // time
+                Date nextRunTime = state.calculateNextRunDate(fs);
+                if(info.higherPriorityStartTime == null || info.higherPriorityStartTime.after(nextRunTime)) {
+                    info.higherPriorityStartTime = nextRunTime;
+                    info.nextHigherPriorityFileset = fs;
+                }
+            }
+        }
 
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        log.info(String.format("Next run date for %s %s job \"%s\": %s",
-                success ? "successfully completed" : "failed",
-                fs.getSchedule(),
-                fs.getName(),
-                sdf.format(state.calculateNextRunDate(fs))));
+        log.info(String.format("Schedule: next job to run is \"%s\" (prio %d%s)%s",
+                info.filesetToRun.getName(),
+                info.filesetToRun.getPriority(),
+                STATE_SUSPENDED.equals(info.filesetToRunState.getCurrentState()) ? ", was suspended" : "",
+                info.startTime == null ? ", immediately" : ", at " + sdf.format(info.startTime)));
+        if(info.nextHigherPriorityFileset != null) {
+            log.info(String.format("Until higher priority job \"%s\" (prio %d) is scheduled to start at %s",
+                    info.nextHigherPriorityFileset.getName(),
+                    info.nextHigherPriorityFileset.getPriority(),
+                    sdf.format(info.higherPriorityStartTime)));
+        }
 
+        return info;
     }
 
     private void loopScheduledJobs() {
+        while(true) {
+            ScheduleInfo schedule = getScheduleInfo();
 
-        Date earliestNextRunDate;
-        Fileset earliestNextRunFileset;
-        do {
-            earliestNextRunDate = null;
-            earliestNextRunFileset = null;
-
-            for(Fileset fs: config.getFilesets()) {
-                if(Fileset.SCHEDULE_ONCE.equals(fs.getSchedule())) {
-                    continue;
-                }
-
-                SyncJobState state = SyncJobStatePersistence.getInstance().getState(fs.getName(), true);
-                if(state.getCurrentState().equals(STATE_WAITING)) {
-                    Date nextRunAt = state.calculateNextRunDate(fs);
-
-                    if(nextRunAt == null || nextRunAt.before(new Date())) {
-                        runScheduledJobWithRetries(fs, state);
-                        nextRunAt = state.calculateNextRunDate(fs);
-                    }
-
-                    if(earliestNextRunDate == null || nextRunAt.before(earliestNextRunDate)) {
-                        earliestNextRunDate = nextRunAt;
-                        earliestNextRunFileset = fs;
-                    }
-                }
-            }
-
-            if(earliestNextRunDate != null) {
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                log.info(String.format("Waiting until %s to execute earliest scheduled %s job \"%s\"...",
-                        sdf.format(earliestNextRunDate),
-                        earliestNextRunFileset.getSchedule(),
-                        earliestNextRunFileset.getName()));
-
+            if(schedule.startTime != null) {
                 try {
-                    Thread.sleep(Math.max(1000, earliestNextRunDate.getTime() - new Date().getTime() + 500));
+                    Thread.sleep(Math.max(1000, schedule.startTime.getTime() - new Date().getTime() + 500));
                 } catch(InterruptedException e) {
                     if(Shutdown.isHappening()) {
                         log.info("Interrupted by shutdown while waiting for next scheduled job to run");
@@ -182,8 +260,8 @@ public class SyncRunner extends Thread {
                     }
                 }
             }
-        } while(earliestNextRunDate != null);
 
-        log.info("No scheduled jobs, quitting");
+            runScheduledJobWithRetries(schedule.filesetToRun, schedule.higherPriorityStartTime, SyncJobStatePersistence.getInstance().getState(schedule.filesetToRun.getName(), true));
+        }
     }
 }
