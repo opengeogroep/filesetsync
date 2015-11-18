@@ -487,7 +487,7 @@ public class FilesetSyncer {
 
         String hashInfo;
         if(fs.isHash()) {
-            hashInfo = String.format(", hashed hashed %d KB, hash speed %s",
+            hashInfo = String.format(", hashed %d KB, hash speed %s",
                     hashBytes / 1024,
                     (hashTime.getValue() < 100 ? "n/a" : Math.round(hashBytes / 1024.0 / (hashTime.getValue() / 1000.0)) + " KB/s"));
         } else {
