@@ -266,6 +266,10 @@ public class SyncRunner extends Thread {
             }
 
             runScheduledJobWithRetries(schedule.filesetToRun, schedule.higherPriorityStartTime, SyncJobStatePersistence.getInstance().getState(schedule.filesetToRun.getName(), true));
+
+            if(Shutdown.isHappening()) {
+                return;
+            }
         }
     }
 }
