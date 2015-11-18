@@ -20,6 +20,7 @@ package nl.opengeogroep.filesetsync.client;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.InvalidClassException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -80,6 +81,9 @@ public class SyncJobStatePersistence implements Serializable {
                         }
                     }
                 }
+            } catch(InvalidClassException ice) {
+                log.info("Saved sync job state saved by incompatible version, starting with new state");
+                instance = new SyncJobStatePersistence();
             } catch(Exception e) {
                 log.error("Error reading sync job state from " + f.getAbsolutePath() + ", starting with new state", e);
                 instance = new SyncJobStatePersistence();

@@ -109,15 +109,36 @@ public class FilesetSyncer {
         state = SyncJobStatePersistence.getInstance().getState(fs.getName(), true);
     }
 
+    private boolean suspendOrAbort() {
+        if(Shutdown.isHappening()) {
+            log.info("System is shutting down, aborting job");
+            state.endRun(STATE_ABORTED);
+            return true;
+        }
+
+        if(endTime != null && System.currentTimeMillis() > endTime.getTime()) {
+            log.info("End time exceeded");
+            state.endRun(STATE_SUSPENDED);
+            return true;
+        }
+
+        return false;
+    }
+
+
     public void sync() {
         if(localCanonicalPath == null) {
             state.endRun(STATE_ERROR);
             return;
         }
+        boolean resume = STATE_SUSPENDED.equals(state.getCurrentState());
+        boolean aborted = STATE_ABORTED.equals(state.getCurrentState());
 
-        log.info(String.format("Starting sync for job \"%s\", last started %s and finished %s",
+        log.info(String.format("%s sync for job \"%s\", last started %s and %s %s",
+                resume ? "Resuming" : "Starting" + (aborted ? " previously aborted" : ""),
                 fs.getName(),
                 state.getLastRun() == null ? "never" : "at " + dateToString(state.getLastRun()),
+                resume ? "suspended" : (aborted ? "aborted" : "finished"),
                 state.getLastFinished() == null ? "never" : "at " + dateToString(state.getLastFinished())));
         log.trace(fs);
 
@@ -131,12 +152,47 @@ public class FilesetSyncer {
         serverUrl += "fileset/";
 
         try {
-            retrieveFilesetList();
-            if(fs.isDelete()) {
-                deleteLocalFiles();
+            if(resume) {
+                if(state.getResumeFileListIndex() == null) {
+                    resume = false;
+                } else {
+                    try {
+                        fileList = SyncJobState.readCachedFileList(fs.getName());
+                    } catch(IOException e) {
+                        log.warn(String.format("Exception reading cached file list, cannot resume suspended job - starting from scratch: %s: %s",
+                                e.getClass(), e.getMessage()));
+                        log.debug("IOException reading cached file list", e);
+                        resume = false;
+                    }
+                    log.info(String.format("Resuming from cached file list at file %d (%d%%)",
+                            state.getResumeFileListIndex() + 1,
+                            Math.round(state.getResumeFileListIndex() / (double)fileList.size() * 100.0)));
+                }
             }
-            compareFilesetList();
-            transferFiles();
+
+            if(!resume) {
+                state.setResumeFileListIndex(null);
+
+                // These actions can not be suspended. Take only a few minutes
+                // on reasonably fast system even for 900k files. May be slow on
+                // embedded systems
+
+                retrieveFilesetList();
+                if(fs.isDelete()) {
+                    if(!deleteLocalFiles()) {
+                        return;
+                    }
+                }
+                if(!compareFilesetList()) {
+                    return;
+                }
+            }
+
+            // Can return with suspended state
+            if(!transferFiles()) {
+                return;
+            }
+
             setDirectoriesLastModified();
 
             log.info("Sync job complete");
@@ -260,19 +316,20 @@ public class FilesetSyncer {
         }
     }
 
-    private void deleteLocalFiles() {
+    private boolean deleteLocalFiles() {
         if(Shutdown.isHappening()) {
-            return;
+            state.endRun(STATE_ABORTED);
+            return false;
         }
 
         if(fs.getRegexp() != null) {
             // XXX only delete local files matching regexp, for now don't delete
             // anything
-            return;
+            return true;
         }
 
         if(fileList.size() == 1 && fileList.get(0).getType() == TYPE_FILE) {
-            return;
+            return true;
         }
 
         for(List<FileRecord> dirList: new FileRecordListDirectoryIterator(fileList)) {
@@ -307,7 +364,8 @@ public class FilesetSyncer {
 
             for(String deleteIt: toDelete) {
                 if(Shutdown.isHappening()) {
-                    return;
+                    state.endRun(STATE_ABORTED);
+                    return false;
                 }
 
                 File f = new File(localDir + File.separator + deleteIt);
@@ -324,13 +382,14 @@ public class FilesetSyncer {
                 }
             }
         }
+        return true;
     }
 
     /**
      * Removes files which are locally up-to-date from the list of files to
      * transfer. Updates lastModified date.
      */
-    private void compareFilesetList() throws IOException {
+    private boolean compareFilesetList() throws IOException {
 
         MutableLong hashTime = new MutableLong();
         long hashBytes = 0;
@@ -343,8 +402,8 @@ public class FilesetSyncer {
 
         for(int index = 0; index < fileList.size(); index++) {
             FileRecord fr = fileList.get(index);
-            if(Shutdown.isHappening()) {
-                return;
+            if(suspendOrAbort()) {
+                return false;
             }
 
             File localFile;
@@ -441,17 +500,24 @@ public class FilesetSyncer {
         if(newerLocalFiles != 0) {
             log.warn(String.format("Not overwriting %d local files with newer local last modified date compared to files on server", newerLocalFiles));
         }
+        return true;
     }
 
-    private void transferFiles() throws IOException {
-        if(Shutdown.isHappening()) {
-            return;
+    /**
+     * @return true if finished, false if unfinished (state status updated)
+     */
+    private boolean transferFiles() throws IOException {
+        if(suspendOrAbort()) {
+            return false;
         }
 
         int fileCount = fileList.size() - alreadyLocal;
+        if(state.getResumeFileListIndex() != null) {
+            fileCount = fileCount - state.getResumeFileListIndex();
+        }
         if(fileCount == 0) {
             log.info("No files to transfer");
-            return;
+            return true;
         }
 
         action(String.format("Transferring %d files", fileCount));
@@ -463,7 +529,8 @@ public class FilesetSyncer {
         totalBytes = 0;
         long chunkSize = FormatUtil.parseByteSize(SyncConfig.getInstance().getProperty("chunkSize","5M"));
 
-        int index = 0;
+        int index = state.getResumeFileListIndex() != null ? state.getResumeFileListIndex() : 0;
+        int startIndex = index;
         int endIndex;
         //String regexp = fs.getRegexp();
         do {
@@ -496,15 +563,30 @@ public class FilesetSyncer {
                 }
             }
             transferChunk(chunkList);
-            if(Shutdown.isHappening()) {
-                return;
-            }
 
             index = endIndex+1;
             chunks++;
+
+            if(suspendOrAbort()) {
+                // Technically we could resume an aborted job, but choice made
+                // to only resume suspended jobs
+                if(STATE_SUSPENDED.equals(state.getCurrentState())) {
+                    log.info(String.format("Suspending job (transferred %d chunks, %d files and %d KB total, %d%% of files transferred)",
+                            chunks,
+                            index,
+                            totalBytes/1024,
+                            Math.round((index - startIndex) / (double)fileList.size() * 100)
+                            ));
+                    state.setResumeFileListIndex(index);
+                    SyncJobStatePersistence.persist();
+                }
+                return false;
+            }
+
         } while(endIndex < fileList.size()-1);
 
         log.info(String.format("Transfer complete, %d chunks, %d KB total", chunks, totalBytes/1024));
+        return true;
     }
 
     private void setDirectoriesLastModified() {

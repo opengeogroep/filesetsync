@@ -57,7 +57,9 @@ public class SyncRunner extends Thread {
         // Initialize all states to Waiting
         for(Fileset fs: config.getFilesets()) {
             SyncJobState state = statePersistence.getState(fs.getName(), true);
-            state.setCurrentState(SyncJobState.STATE_WAITING);
+            if(!UNFINISHED_STATES.contains(state.getCurrentState())) {
+                state.setCurrentState(SyncJobState.STATE_WAITING);
+            }
         }
 
         doRunOnceJobs();
@@ -167,6 +169,8 @@ public class SyncRunner extends Thread {
                 continue;
             }
 
+            log.debug("Determinig schedule for job " + fs.getName() + ", state: " + state.toString());
+
             // First fileset we're looking at, or higher priority than currently
             // selected fileset?
             if(highestPriority == null || fs.getPriority() > highestPriority) {
@@ -185,7 +189,7 @@ public class SyncRunner extends Thread {
                         info.startTime = fsNextRun;
                     }
                 }
-            } else if(info.startTime != null) {
+            } else if(info.startTime != null && info.startTime.getTime() > System.currentTimeMillis()) {
                 // Lower priority can run if current job is not immediately
                 // scheduled and lower priority is immediately scheduled or
                 // before higher priority job

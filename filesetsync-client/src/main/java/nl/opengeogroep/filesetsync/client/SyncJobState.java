@@ -23,10 +23,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import nl.opengeogroep.filesetsync.FileRecord;
@@ -43,7 +47,7 @@ import org.apache.http.Header;
  * @author Matthijs Laan
  */
 public class SyncJobState implements Serializable {
-    private static final long serialVersionUID = 0L;
+    private static final long serialVersionUID = 1L;
 
     public static final String STATE_WAITING = "waiting";
     public static final String STATE_SCHEDULED = "scheduled";
@@ -51,7 +55,19 @@ public class SyncJobState implements Serializable {
     public static final String STATE_SUSPENDED = "suspended";
     public static final String STATE_RETRY = "retry";
     public static final String STATE_COMPLETED = "completed";
+    public static final String STATE_ABORTED = "aborted";
     public static final String STATE_ERROR = "error";
+
+    /** States when the job should be started immediately, instead of the
+     * schedule after the last run. ERROR state is not tried again, only at the
+     * next scheduled time (maybe add ERROR schedule for weekly jobs so it can
+     * be tried the next day). When a job is finished with ERROR state it has
+     * been retried maxTries times already.
+     */
+    public static final Set UNFINISHED_STATES = Collections.unmodifiableSet(new HashSet(Arrays.asList(new String[] {
+        STATE_SUSPENDED,
+        STATE_ABORTED
+    })));
 
     private Date lastRun;
 
@@ -66,6 +82,8 @@ public class SyncJobState implements Serializable {
     private Date fileListDate;
 
     private boolean fileListHashed;
+
+    private Integer resumeFileListIndex;
 
     private transient int failedTries;
 
@@ -126,6 +144,14 @@ public class SyncJobState implements Serializable {
 
     public void setFileListHashed(boolean fileListHashed) {
         this.fileListHashed = fileListHashed;
+    }
+
+    public Integer getResumeFileListIndex() {
+        return resumeFileListIndex;
+    }
+
+    public void setResumeFileListIndex(Integer resumeFileListIndex) {
+        this.resumeFileListIndex = resumeFileListIndex;
     }
 
     public int getFailedTries() {
@@ -196,7 +222,7 @@ public class SyncJobState implements Serializable {
     }
 
     public Date calculateNextRunDate(Fileset fs) {
-        if(lastRun == null || STATE_SUSPENDED.equals(currentState)) {
+        if(lastRun == null || UNFINISHED_STATES.contains(currentState)) {
             return null;
         } else {
             Calendar c = GregorianCalendar.getInstance();
