@@ -575,7 +575,7 @@ public class FilesetSyncer {
                             chunks,
                             index,
                             totalBytes/1024,
-                            Math.round((index - startIndex) / (double)fileList.size() * 100)
+                            Math.round((index) / (double)fileList.size() * 100)
                             ));
                     state.setResumeFileListIndex(index);
                     SyncJobStatePersistence.persist();
