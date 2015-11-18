@@ -132,6 +132,7 @@ public class SyncRunner extends Thread {
         } else {
             // Keep scheduled, also on error
             state.setCurrentState(STATE_WAITING);
+            state.setFailedTries(0);
             SyncJobStatePersistence.persist();
 
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
