@@ -170,7 +170,12 @@ public class SyncRunner extends Thread {
                 continue;
             }
 
-            log.debug("Determinig schedule for job " + fs.getName() + ", state: " + state.toString());
+            log.debug(String.format("Determinig schedule for job %s, status %s, last run %tc, last finished %tc, next scheduled %tc",
+                    fs.getName(),
+                    state.getCurrentState(),
+                    state.getLastRun(),
+                    state.getLastFinished(),
+                    state.calculateNextRunDate(fs)));
 
             // First fileset we're looking at, or higher priority than currently
             // selected fileset?

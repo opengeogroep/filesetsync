@@ -262,7 +262,7 @@ public class FilesetSyncer {
             ResponseHandler<List<FileRecord>> rh = new ResponseHandler<List<FileRecord>>() {
                 @Override
                 public List handleResponse(HttpResponse hr) throws ClientProtocolException, IOException {
-                    log.info("< " + hr.getStatusLine());
+                    log.debug("< " + hr.getStatusLine());
 
                     int status = hr.getStatusLine().getStatusCode();
                     if(status == SC_NOT_MODIFIED) {
@@ -287,7 +287,7 @@ public class FilesetSyncer {
                 }
             };
 
-            log.info("> " + get.getRequestLine());
+            log.debug("> " + get.getRequestLine());
             fileList = httpClient.execute(get, rh);
 
             if(fileList == null) {
