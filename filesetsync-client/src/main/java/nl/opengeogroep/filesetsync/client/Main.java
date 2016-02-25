@@ -154,6 +154,8 @@ public final class Main {
             }
         }
 
+        Reporting.reportClientStartup();
+
         SyncRunner.getInstance().start();
     }
 }

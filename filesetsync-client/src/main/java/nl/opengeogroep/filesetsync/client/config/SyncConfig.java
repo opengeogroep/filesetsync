@@ -21,7 +21,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
@@ -63,6 +62,12 @@ public class SyncConfig {
     private String varDir;
 
     /**
+     * Whether to report status to filesetsync-server, defaults to true.
+     */
+    @XmlElement(name = "reporting")
+    private boolean reportingEnabled = true;
+
+    /**
      * Global properties.
      */
     @XmlElementWrapper(name = "globals")
@@ -91,6 +96,14 @@ public class SyncConfig {
 
     public void setVarDir(String varDir) {
         this.varDir = varDir;
+    }
+
+    public boolean isReportingEnabled() {
+        return reportingEnabled;
+    }
+
+    public void setReportingEnabled(boolean reportingEnabled) {
+        this.reportingEnabled = reportingEnabled;
     }
 
     public List<Property> getProperties() {
