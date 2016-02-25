@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <title>About</title>
     </head>
     <body>
-        <h1>filesetsync-admin</h1>
+        <h1>filesetsync-server</h1>
         <c:set var="version" value="${project.version}"/>
         <table>
             
