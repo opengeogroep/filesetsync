@@ -62,10 +62,10 @@ public class SyncConfig {
     private String varDir;
 
     /**
-     * Whether to report status to filesetsync-server, defaults to true.
+     * URL to report status to, leave empty to disable.
      */
     @XmlElement(name = "reporting")
-    private boolean reportingEnabled = true;
+    private String reportingURL = null;
 
     /**
      * Global properties.
@@ -98,12 +98,12 @@ public class SyncConfig {
         this.varDir = varDir;
     }
 
-    public boolean isReportingEnabled() {
-        return reportingEnabled;
+    public String getReportingURL() {
+        return reportingURL;
     }
 
-    public void setReportingEnabled(boolean reportingEnabled) {
-        this.reportingEnabled = reportingEnabled;
+    public void setReportingURL(String reportingURL) {
+        this.reportingURL = reportingURL;
     }
 
     public List<Property> getProperties() {

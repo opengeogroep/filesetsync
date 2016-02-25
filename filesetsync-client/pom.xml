@@ -56,6 +56,12 @@
             <artifactId>filesetsync-common</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+            <version>20140107</version>
+            <type>jar</type>
+        </dependency>
     </dependencies>
 
     <build>
