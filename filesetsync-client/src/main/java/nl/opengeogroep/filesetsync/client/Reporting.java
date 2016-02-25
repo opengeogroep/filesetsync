@@ -198,6 +198,7 @@ public class Reporting {
         JSONObject report = new JSONObject();
         RuntimeMXBean rtBean = ManagementFactory.getRuntimeMXBean();
         report.put("start_time", rtBean.getStartTime() / 1000);
+        report.put("config_last_modified", SyncConfig.getInstance().getConfigLastModified());
 
         JSONObject client = new JSONObject();
         report.put("client", client);
@@ -220,6 +221,7 @@ public class Reporting {
         runtime.put("vm_vendor", rtBean.getVmVendor());
         runtime.put("vm_version", rtBean.getVmVersion());
         runtime.put("name", rtBean.getName());
+
 
         startupReport = report;
 

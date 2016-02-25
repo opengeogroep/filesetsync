@@ -81,6 +81,8 @@ public class SyncConfig {
     @XmlElement(name = "fileset")
     List<Fileset> filesets = new ArrayList();
 
+    private Long configLastModified;
+
     // <editor-fold defaultstate="collapsed" desc="getters and setters">
     public List<Plugin> getPlugins() {
         return plugins;
@@ -121,6 +123,14 @@ public class SyncConfig {
     public void setFilesets(List<Fileset> filesets) {
         this.filesets = filesets;
     }
+
+    public Long getConfigLastModified() {
+        return configLastModified;
+    }
+
+    public void setConfigLastModified(Long configLastModified) {
+        this.configLastModified = configLastModified;
+    }
    // </editor-fold>
 
     public static SyncConfig getInstance() {
@@ -128,16 +138,19 @@ public class SyncConfig {
     }
 
     public static void load(String basePath, String filename) throws JAXBException, IOException {
-        InputStream in = new FileInputStream(filename);
+        File f = new File(filename);
+
+        InputStream in = new FileInputStream(f);
         JAXBContext jaxb = JAXBContext.newInstance(SyncConfig.class);
         Unmarshaller um = jaxb.createUnmarshaller();
         try {
             instance = (SyncConfig) um.unmarshal(in);
+            instance.setConfigLastModified(f.lastModified() / 1000);
         } finally {
             in.close();
         }
 
-        File f = new File(instance.varDir);
+        f = new File(instance.varDir);
         if(!f.isAbsolute()) {
             instance.varDir = basePath + File.separator + instance.varDir;
         }
