@@ -123,7 +123,7 @@ public class SetFileXpathToHttpRequestHeaderPlugin implements PluginInterface, F
             XPath xpath = XPathFactory.newInstance().newXPath();
             String value = xpath.evaluate(xpathString, doc);
 
-            log.info(String.format("Value extracted from file \"%s\" using xpath \"%s\": %s",
+            log.debug(String.format("Value extracted from file \"%s\" using xpath \"%s\": %s",
                     file,
                     xpathString,
                     value));
