@@ -35,6 +35,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import nl.opengeogroep.filesetsync.FileRecord;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
+import static nl.opengeogroep.filesetsync.client.config.Fileset.*;
 import nl.opengeogroep.filesetsync.protocol.Protocol;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import nl.opengeogroep.filesetsync.protocol.BufferedFileListEncoder;
@@ -47,7 +48,7 @@ import org.apache.http.Header;
  * @author Matthijs Laan
  */
 public class SyncJobState implements Serializable {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L;
 
     public static final String STATE_WAITING = "waiting";
     public static final String STATE_SCHEDULED = "scheduled";
@@ -76,6 +77,8 @@ public class SyncJobState implements Serializable {
     private String currentAction;
 
     private Date lastFinished;
+
+    private String lastFinishedState;
 
     private String fileListRemotePath;
 
@@ -120,6 +123,14 @@ public class SyncJobState implements Serializable {
 
     public void setLastFinished(Date lastFinished) {
         this.lastFinished = lastFinished;
+    }
+
+    public String getLastFinishedState() {
+        return lastFinishedState;
+    }
+
+    public void setLastFinishedState(String lastFinishedState) {
+        this.lastFinishedState = lastFinishedState;
     }
 
     public String getFileListRemotePath() {
@@ -202,7 +213,6 @@ public class SyncJobState implements Serializable {
     @Override
     public String toString() {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
-
     }
 
     void startNewRun() {
@@ -216,6 +226,7 @@ public class SyncJobState implements Serializable {
 
     void endRun(String state) {
         setLastFinished(new Date());
+        setLastFinishedState(state);
         setCurrentState(state);
 
         SyncJobStatePersistence.persist();
@@ -227,12 +238,49 @@ public class SyncJobState implements Serializable {
         } else {
             Calendar c = GregorianCalendar.getInstance();
             c.setTime(lastRun);
-            if(Fileset.SCHEDULE_HOURLY.equals(fs.getSchedule())) {
+
+            String actualSchedule = fs.getSchedule();
+            String retrySchedule = fs.getRetrySchedule();
+
+            // Determine alternate schedule in case last run finished with error
+
+            if(STATE_ERROR.equals(lastFinishedState) && SCHEDULE_RETRY_QUARTER.equals(retrySchedule)) {
+                // Shortest interval retry setting always applies
+                actualSchedule = retrySchedule;
+            }
+
+            if(STATE_ERROR.equals(lastFinishedState) && !actualSchedule.equals(retrySchedule)) {
+                if(SCHEDULE_WEEKLY.equals(actualSchedule)) {
+                    // For normal schedule weekly:
+                    // Retry schedule setting, actual schedule on error
+                    // daily                   daily
+                    // hourly                  hourly
+                    // auto                    hourly
+                    actualSchedule = SCHEDULE_DAILY.equals(retrySchedule) ? SCHEDULE_DAILY : SCHEDULE_HOURLY;
+                } else if(SCHEDULE_DAILY.equals(actualSchedule)) {
+                    // For normal schedule daily:
+                    // Retry schedule setting, actual schedule on error
+                    // weekly                  daily
+                    // hourly                  hourly
+                    // auto                    hourly
+                    actualSchedule = SCHEDULE_WEEKLY.equals(retrySchedule) ? SCHEDULE_DAILY : SCHEDULE_HOURLY;
+                } else if(SCHEDULE_HOURLY.equals(actualSchedule)) {
+                    // For normal schedule hourly:
+                    // Retry schedule setting, actual schedule on error
+                    // weekly                  hourly
+                    // daily                   hourly
+                    // auto                    quarterly
+                    actualSchedule = SCHEDULE_RETRY_AUTO.equals(retrySchedule) ? SCHEDULE_RETRY_QUARTER : SCHEDULE_HOURLY;
+                }
+            }
+            if(Fileset.SCHEDULE_HOURLY.equals(actualSchedule)) {
                 c.add(Calendar.HOUR_OF_DAY, 1);
-            } else if(Fileset.SCHEDULE_DAILY.equals(fs.getSchedule())) {
+            } else if(Fileset.SCHEDULE_DAILY.equals(actualSchedule)) {
                 c.add(Calendar.DAY_OF_YEAR, 1);
-            } else if(Fileset.SCHEDULE_WEEKLY.equals(fs.getSchedule())) {
+            } else if(Fileset.SCHEDULE_WEEKLY.equals(actualSchedule)) {
                 c.add(Calendar.WEEK_OF_YEAR, 1);
+            } else if(Fileset.SCHEDULE_RETRY_QUARTER.equals(actualSchedule)) {
+                c.add(Calendar.MINUTE, 15);
             } else {
                 throw new IllegalArgumentException("Invalid schedule: " + fs.getSchedule());
             }

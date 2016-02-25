@@ -42,6 +42,8 @@ public class Fileset {
     public static final String SCHEDULE_DAILY = "daily";
     public static final String SCHEDULE_HOURLY = "hourly";
     public static final String SCHEDULE_WEEKLY = "weekly";
+    public static final String SCHEDULE_RETRY_AUTO = "auto";
+    public static final String SCHEDULE_RETRY_QUARTER = "quarter";
 
     /**
      * Name for identification.
@@ -58,8 +60,18 @@ public class Fileset {
     /**
      * When to synchronize this fileset. No schedule means run once at startup.
      */
-    @XmlElement(defaultValue=SCHEDULE_ONCE)
-    private String schedule;
+    @XmlElement
+    private String schedule = SCHEDULE_ONCE;
+
+    /**
+     * Retry schedule after job failed with error. Valid values SCHEDULE_DAILY,
+     * SCHEDULE_HOURLY, SCHEDULE_WEEKLY, SCHEDULE_RETRY_AUTO. Retry schedule with
+     * longer time interval than the normal schedule are interpreted as the normale
+     * schedule. SCHEDULE_RETRY_AUTO means 5 minutes for hourly, 1 hour for daily
+     * and weekly.
+     */
+    @XmlElement
+    private String retrySchedule = SCHEDULE_RETRY_AUTO;
 
     /**
      * Priority: when another fileset with higher priority is scheduled to start
@@ -150,6 +162,14 @@ public class Fileset {
 
     public void setSchedule(String schedule) {
         this.schedule = schedule;
+    }
+
+    public String getRetrySchedule() {
+        return retrySchedule;
+    }
+
+    public void setRetrySchedule(String retrySchedule) {
+        this.retrySchedule = retrySchedule;
     }
 
     public int getPriority() {

@@ -153,7 +153,7 @@ public class SyncRunner extends Thread {
     }
 
     /**
-     * Find the with the earliest start date and the date when a higher priority
+     * Find the job with the earliest start date and the date when a higher priority
      * fileset is scheduled, or if no filesets are to be started, the date for
      * the earliest next run.
      */
@@ -170,11 +170,12 @@ public class SyncRunner extends Thread {
                 continue;
             }
 
-            log.debug(String.format("Determinig schedule for job %s, status %s, last run %tc, last finished %tc, next scheduled %tc",
+            log.debug(String.format("Determining schedule for job %s, status %s, last run %tc, last finished %tc%s, next scheduled %tc",
                     fs.getName(),
                     state.getCurrentState(),
                     state.getLastRun(),
                     state.getLastFinished(),
+                    STATE_ERROR.equals(state.getLastFinishedState()) ? " with error, using retry schedule " + (fs.getRetrySchedule() == null ? "default" : fs.getRetrySchedule()) : "",
                     state.calculateNextRunDate(fs)));
 
             // First fileset we're looking at, or higher priority than currently
