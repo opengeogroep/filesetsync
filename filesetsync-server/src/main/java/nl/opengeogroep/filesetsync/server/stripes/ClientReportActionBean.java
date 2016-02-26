@@ -122,7 +122,7 @@ public class ClientReportActionBean implements ActionBean {
             log.error(String.format("Exception storing %s: %s: %s",
                     msg, e.getClass(), e.getMessage()));
 
-            return new ErrorMessageResolution(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Exception storing report: " + msg);
+            return new ErrorMessageResolution(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Exception storing report: " + e.getClass() + ": " + e.getMessage());
         }
     }
 }

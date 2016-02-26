@@ -41,9 +41,9 @@ public class ClientReportPersistence {
             qr().insert("insert into client_startup(client_id, machine_id, start_time, report) values (?, ?, to_timestamp(?), ?::json)", new ScalarHandler(), clientId, machineId, startTime, report.toString());
         } else if(REPORT_STATE.equals(type)) {
             qr().update("delete from client_state where client_id=? and machine_id=?", clientId, machineId);
-            qr().insert("insert into client_state(client_id, machine_id, report_time, ip, current_state) values (?, ?, ?, ?, ?::json)",
+            qr().insert("insert into client_state(client_id, machine_id, report_time, ip, current_state) values (?, ?, to_timestamp(?), ?, ?::json)",
                     new ScalarHandler(),
-                    clientId, machineId, new java.sql.Date(System.currentTimeMillis()), ip, report.toString());
+                    clientId, machineId, System.currentTimeMillis() / 1000.0, ip, report.toString());
         } else if(REPORT_JOB_LOG.equals(type)) {
             String job = report.getString("job");
             long startTime = report.getLong("start_time");
