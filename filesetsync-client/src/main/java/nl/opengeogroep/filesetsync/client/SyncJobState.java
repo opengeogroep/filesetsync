@@ -294,6 +294,7 @@ public class SyncJobState implements Serializable {
         j.put("last_run", lastRun == null ? null : lastRun.getTime());
         j.put("last_finished", lastFinished == null ? null : lastFinished.getTime());
         j.put("last_finished_state", lastFinishedState);
+        j.put("last_finished_details", lastFinishedDetails);
         j.put("last_succeeded", lastSucceeded == null ? null : lastSucceeded.getTime());
         j.put("action", currentAction);
         j.put("action_since", currentActionSince);
