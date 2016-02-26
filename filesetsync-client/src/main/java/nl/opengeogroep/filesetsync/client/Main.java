@@ -154,6 +154,15 @@ public final class Main {
             }
         }
 
+        AppState.load();
+
+        Object firstRun = AppState.getStats().get("first_run");
+        if(firstRun == null) {
+            AppState.getStats().put("first_run", System.currentTimeMillis());
+        }
+
+        AppState.addStatsValue("startup_count", 1);
+
         Reporting.reportClientStartup();
 
         SyncRunner.getInstance().start();

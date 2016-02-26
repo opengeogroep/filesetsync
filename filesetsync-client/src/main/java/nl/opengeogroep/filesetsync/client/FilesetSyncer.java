@@ -140,7 +140,11 @@ public class FilesetSyncer {
                 state.getLastRun() == null ? "never" : "at " + dateToString(state.getLastRun()),
                 resume ? "suspended" : (aborted ? "aborted" : "finished"),
                 state.getLastFinished() == null ? "never" : "at " + dateToString(state.getLastFinished())));
-        log.trace(fs);
+        if(log.isTraceEnabled()) {
+            log.trace(fs);
+        }
+        AppState.updateMode("syncing");
+        AppState.updateCurrentFileset(fs);
 
         PluginContext.getInstance().beforeStart(fs, state);
         state.startNewRun();
@@ -176,7 +180,6 @@ public class FilesetSyncer {
                 // These actions can not be suspended. Take only a few minutes
                 // on reasonably fast system even for 900k files. May be slow on
                 // embedded systems
-
                 retrieveFilesetList();
                 if(fs.isDelete()) {
                     if(!deleteLocalFiles()) {
@@ -208,23 +211,37 @@ public class FilesetSyncer {
         } catch(IOException e) {
             state.setFailedTries(state.getFailedTries()+1);
 
-            log.error("Exception during sync job: " + ExceptionUtils.getMessage(e));
+            String exception = "Exception during sync job: " + ExceptionUtils.getMessage(e);
+            log.error(exception);
             log.trace("Full stack trace", e);
             if(state.getFailedTries() >= fs.getMaxTries()) {
-                log.error("Retryable IOException but max tries reached after " + state.getFailedTries() + " times, fatal error");
-                state.endRun(STATE_ERROR);
+                String msg = "Retryable IOException but max tries reached after " + state.getFailedTries() + " times, fatal error";
+                log.error(msg);
+                state.endRun(STATE_ERROR, exception + ", " + msg);
+                AppState.updateCurrentFileset(null);
             } else {
-                log.error(String.format("IO exception, retrying later after %d seconds (try %d of max %d)", fs.getRetryWaitTime(), state.getFailedTries(), fs.getMaxTries()));
-                state.endRun(STATE_RETRY);
+                String msg = String.format("IO exception, retrying later after %d seconds (try %d of max %d)", fs.getRetryWaitTime(), state.getFailedTries(), fs.getMaxTries());
+                log.error(msg);
+                state.endRun(STATE_RETRY, exception + ", " + msg);
             }
         } finally {
             SyncJobStatePersistence.setCurrentFileset(null);
+            Reporting.reportState(true);
         }
     }
 
     private void action(String s) {
         state.setCurrentAction(s);
         log.info(s);
+        Reporting.reportState(true);
+    }
+
+    private void progress(Long countTotal, Long count, Long sizeTotal, Long size) {
+        state.setProgressCountTotal(countTotal);
+        state.setProgressCount(count);
+        state.setProgressSizeTotal(sizeTotal);
+        state.setProgressSize(size);
+        Reporting.reportState();
     }
 
     private void addExtraHeaders(HttpUriRequest r) {
@@ -332,6 +349,10 @@ public class FilesetSyncer {
             return true;
         }
 
+        long total = fileList.size();
+        long count = 0;
+        progress(total, count, null, null);
+        action("Checking for and deleting local files not in filelist");
         for(List<FileRecord> dirList: new FileRecordListDirectoryIterator(fileList)) {
             Iterator<FileRecord> it = dirList.iterator();
             FileRecord dir = it.next();
@@ -343,8 +364,10 @@ public class FilesetSyncer {
 
             List<String> toDelete = new ArrayList(Arrays.asList(localDir.list()));
 
+            long dirCount = 0;
             while(it.hasNext()) {
                 FileRecord fr = it.next();
+                dirCount++;
                 String name = dir.getName().equals(".") ? fr.getName() : fr.getName().substring(dir.getName().length()+1);
                 if(toDelete.indexOf(name) != -1) {
                     // Don't delete this file -- may need to be overwritten though
@@ -381,6 +404,9 @@ public class FilesetSyncer {
                     log.error("Exception deleting file " + f + ": " + ExceptionUtils.getMessage(e));
                 }
             }
+            // Report progress after checking and deleting each directory
+            count += dirCount;
+            progress(total, count, null, null);
         }
         return true;
     }
@@ -391,12 +417,17 @@ public class FilesetSyncer {
      */
     private boolean compareFilesetList() throws IOException {
 
+
         MutableLong hashTime = new MutableLong();
         long hashBytes = 0;
         long startTime = System.currentTimeMillis();
         long progressTime = startTime;
-        int processed = 0;
+        long total = fileList.size();
+        long processed = 0;
         int newerLocalFiles = 0;
+
+        progress(total, processed, null, fs.isHash() ? hashBytes : null);
+        action("Comparing local files to filelist");
 
         boolean setLastModifiedToServer = "true".equals(fs.getProperty("setLastModifiedToServer"));
 
@@ -475,6 +506,7 @@ public class FilesetSyncer {
             }
 
             processed++;
+            progress(total, processed, null, fs.isHash() ? hashBytes : null);
             long time = System.currentTimeMillis();
             if(time - progressTime > 30000) {
                 log.info(String.format("Still comparing files, processed %d files", processed));
@@ -511,27 +543,42 @@ public class FilesetSyncer {
             return false;
         }
 
-        int fileCount = fileList.size() - alreadyLocal;
+        long fileCount = fileList.size() - alreadyLocal;
         if(state.getResumeFileListIndex() != null) {
             fileCount = fileCount - state.getResumeFileListIndex();
         }
-        if(fileCount == 0) {
+        if(fileCount <= 0) {
             log.info("No files to transfer");
             return true;
         }
-
-        action(String.format("Transferring %d files", fileCount));
 
         // A "chunk" here means a set of multiple files not smaller than the
         // configured chunk size (unless there are no more files)
 
         long chunks = 0;
         totalBytes = 0;
+        long totalFiles = 0;
         long chunkSize = FormatUtil.parseByteSize(SyncConfig.getInstance().getProperty("chunkSize","5M"));
 
         int index = state.getResumeFileListIndex() != null ? state.getResumeFileListIndex() : 0;
-        int startIndex = index;
         int endIndex;
+
+        // Calculate total size to transfer and if resumed how much already transferred
+        long totalSize = 0;
+        for(int j = 0; j < fileList.size(); j++) {
+            FileRecord fr = fileList.get(j);
+            if(fr != null) {
+                if(j < index) {
+                    // Resumed, count as already transferred
+                    totalBytes += fr.getSize();
+                }
+                totalSize += fr.getSize();
+            }
+        }
+
+        progress(fileCount, totalFiles, totalSize, totalBytes);
+        action(String.format("Transferring %d files", fileCount));
+
         //String regexp = fs.getRegexp();
         do {
             int thisChunkSize = 0;
@@ -566,6 +613,9 @@ public class FilesetSyncer {
 
             index = endIndex+1;
             chunks++;
+            totalFiles += chunkList.size();
+            // totalBytes updated by transferChunk()
+            progress(fileCount, totalFiles, totalSize, totalBytes);
 
             if(suspendOrAbort()) {
                 // Technically we could resume an aborted job, but choice made
@@ -591,9 +641,13 @@ public class FilesetSyncer {
 
     private void setDirectoriesLastModified() {
         if(!directoriesLastModifiedTimes.isEmpty()) {
-            log.info(String.format("Setting last modified times of %d directories...", directoriesLastModifiedTimes.size()));
+            long total = directoriesLastModifiedTimes.size();
+            long count = 0;
+            progress(total, ++count, null, null);
+            action(String.format("Setting last modified times of %d directories...", total));
             for(Pair<File,Long> dlm: directoriesLastModifiedTimes) {
                 dlm.getLeft().setLastModified(dlm.getRight());
+                progress(total, ++count, null, null);
             }
         }
     }

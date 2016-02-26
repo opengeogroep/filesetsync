@@ -24,8 +24,11 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementWrapper;
+import nl.opengeogroep.filesetsync.client.SyncJobState;
+import nl.opengeogroep.filesetsync.client.SyncJobStatePersistence;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.json.JSONObject;
 
 /**
  * Represents the configuration of a fileset to synchronize (either download or
@@ -265,5 +268,20 @@ public class Fileset {
     @Override
     public String toString() {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.MULTI_LINE_STYLE);
+    }
+
+    public JSONObject toJSON() {
+        JSONObject j = new JSONObject();
+        j.put("name", name);
+        j.put("schedule", schedule);
+        j.put("priority", priority);
+        j.put("remote", remote);
+        j.put("local", local);
+        j.put("regexp", regexp);
+        SyncJobState state = SyncJobStatePersistence.getInstance().getState(name, false);
+        if(state != null) {
+            j.put("state", state.toJSON());
+        }
+        return j;
     }
 }

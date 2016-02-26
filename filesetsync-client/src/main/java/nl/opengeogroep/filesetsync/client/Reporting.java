@@ -44,6 +44,7 @@ import org.json.JSONObject;
  * @author Matthijs Laan
  */
 public class Reporting {
+    public static final int STATE_REPORT_INTERVAL_MS = 30000;
 
     private static final Log log = LogFactory.getLog(Reporting.class);
 
@@ -121,8 +122,8 @@ public class Reporting {
             } catch(Exception e) {
                 machineId = "<unknown>";
             }
+            log.info("Using machine id: " + machineId);
         }
-        log.info("Using machine id: " + machineId);
     }
 
     private static String getMacHex(NetworkInterface ni) throws SocketException {
@@ -164,13 +165,13 @@ public class Reporting {
                     .addParameter("machineId", machineId)
                     .build();
 
-        log.debug("> " + post.getRequestLine());
+        log.trace("> " + post.getRequestLine());
 
         try(CloseableHttpClient httpClient = HttpClientUtil.get()) {
             Boolean ok = httpClient.execute(post, new ResponseHandler<Boolean>() {
                 @Override
                 public Boolean handleResponse(HttpResponse hr) {
-                    log.debug("< " + hr.getStatusLine());
+                    log.trace("< " + hr.getStatusLine());
 
                     boolean ok = hr.getStatusLine().getStatusCode() == SC_OK;
                     if(!ok) {
@@ -222,7 +223,6 @@ public class Reporting {
         runtime.put("vm_version", rtBean.getVmVersion());
         runtime.put("name", rtBean.getName());
 
-
         startupReport = report;
 
         trySendingStartupReport();
@@ -232,6 +232,21 @@ public class Reporting {
         if(!startupReportSent) {
             log.trace("Sending startup report " + startupReport.toString(4));
             startupReportSent = sendReport("startup", startupReport);
+        }
+    }
+
+    public static void reportState() {
+        reportState(false);
+    }
+
+    public static void reportState(boolean forceUpdate) {
+        if(forceUpdate || AppState.getLastReported() < (System.currentTimeMillis() - STATE_REPORT_INTERVAL_MS)) {
+            if(!forceUpdate) {
+                trySendingStartupReport();
+            }
+            sendReport("state", AppState.toJSON());
+            // Set last reported whether succeeded or not
+            AppState.setLastReported(System.currentTimeMillis());
         }
     }
 }

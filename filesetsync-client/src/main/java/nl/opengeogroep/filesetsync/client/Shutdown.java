@@ -38,7 +38,6 @@ public class Shutdown extends Thread {
         log.info("Shutdown hook called");
         happening = true;
         SyncRunner.getInstance().interrupt();
+        AppState.save();
     }
-
-
 }

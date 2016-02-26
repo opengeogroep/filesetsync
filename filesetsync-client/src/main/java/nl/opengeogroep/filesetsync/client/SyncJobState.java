@@ -30,6 +30,7 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -42,6 +43,7 @@ import nl.opengeogroep.filesetsync.protocol.BufferedFileListEncoder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.http.Header;
+import org.json.JSONObject;
 
 /**
  * State about synchronizing a Fileset. Includes the file list cache.
@@ -74,9 +76,18 @@ public class SyncJobState implements Serializable {
 
     private String currentState;
 
-    private String currentAction;
+    private transient String currentAction;
+    private transient Long currentActionSince;
+    private transient Long progressCountTotal;
+    private transient Long progressCount;
+    private transient Long progressSizeTotal;
+    private transient Long progressSize;
 
     private Date lastFinished;
+
+    private transient String lastFinishedDetails;
+
+    private Date lastSucceeded;
 
     private String lastFinishedState;
 
@@ -114,6 +125,12 @@ public class SyncJobState implements Serializable {
     }
 
     public void setCurrentAction(String currentAction) {
+        if(!Objects.equals(this.currentAction, currentAction)) {
+            this.currentActionSince = System.currentTimeMillis();
+        }
+        if(currentAction == null) {
+            this.currentActionSince = null;
+        }
         this.currentAction = currentAction;
     }
 
@@ -131,6 +148,30 @@ public class SyncJobState implements Serializable {
 
     public void setLastFinishedState(String lastFinishedState) {
         this.lastFinishedState = lastFinishedState;
+    }
+
+    public Long getCurrentActionSince() {
+        return currentActionSince;
+    }
+
+    public void setCurrentActionSince(Long currentActionSince) {
+        this.currentActionSince = currentActionSince;
+    }
+
+    public Date getLastSucceeded() {
+        return lastSucceeded;
+    }
+
+    public void setLastSucceeded(Date lastSucceeded) {
+        this.lastSucceeded = lastSucceeded;
+    }
+
+    public String getLastFinishedDetails() {
+        return lastFinishedDetails;
+    }
+
+    public void setLastFinishedDetails(String lastFinishedDetails) {
+        this.lastFinishedDetails = lastFinishedDetails;
     }
 
     public String getFileListRemotePath() {
@@ -183,6 +224,38 @@ public class SyncJobState implements Serializable {
     public void setRequestHeaders(List<Header> requestHeaders) {
         this.requestHeaders = requestHeaders;
     }
+
+    public Long getProgressCountTotal() {
+        return progressCountTotal;
+    }
+
+    public void setProgressCountTotal(Long progressCountTotal) {
+        this.progressCountTotal = progressCountTotal;
+    }
+
+    public Long getProgressCount() {
+        return progressCount;
+    }
+
+    public void setProgressCount(Long progressCount) {
+        this.progressCount = progressCount;
+    }
+
+    public Long getProgressSizeTotal() {
+        return progressSizeTotal;
+    }
+
+    public void setProgressSizeTotal(Long progressSizeTotal) {
+        this.progressSizeTotal = progressSizeTotal;
+    }
+
+    public Long getProgressSize() {
+        return progressSize;
+    }
+
+    public void setProgressSize(Long progressSize) {
+        this.progressSize = progressSize;
+    }
     // </editor-fold>
 
     public static void writeCachedFileList(String name, List<FileRecord> fileList) throws IOException {
@@ -215,6 +288,22 @@ public class SyncJobState implements Serializable {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
 
+    public JSONObject toJSON() {
+        JSONObject j = new JSONObject();
+        j.put("state", currentState);
+        j.put("last_run", lastRun == null ? null : lastRun.getTime());
+        j.put("last_finished", lastFinished == null ? null : lastFinished.getTime());
+        j.put("last_finished_state", lastFinishedState);
+        j.put("last_succeeded", lastSucceeded == null ? null : lastSucceeded.getTime());
+        j.put("action", currentAction);
+        j.put("action_since", currentActionSince);
+        j.put("progress_count_total", progressCountTotal);
+        j.put("progress_count", progressCount);
+        j.put("progress_size_total", progressSizeTotal);
+        j.put("progress_size", progressSize);
+        return j;
+    }
+
     void startNewRun() {
         setLastRun(new Date());
         setCurrentState(STATE_STARTED);
@@ -225,9 +314,24 @@ public class SyncJobState implements Serializable {
     }
 
     void endRun(String state) {
+        endRun(state, null);
+    }
+
+    void endRun(String state, String details) {
         setLastFinished(new Date());
         setLastFinishedState(state);
+        setLastFinishedDetails(details);
         setCurrentState(state);
+        setCurrentAction(null);
+
+        if(STATE_COMPLETED.equals(state)) {
+            setLastSucceeded(getLastFinished());
+        }
+
+        setProgressCountTotal(null);
+        setProgressCount(null);
+        setProgressSizeTotal(null);
+        setProgressSize(null);
 
         SyncJobStatePersistence.persist();
     }

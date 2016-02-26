@@ -24,6 +24,7 @@ import static nl.opengeogroep.filesetsync.client.SyncJobState.*;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import nl.opengeogroep.filesetsync.client.util.L10n;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -39,6 +40,8 @@ public class SyncRunner extends Thread {
 
     SyncConfig config = SyncConfig.getInstance();
     SyncJobStatePersistence statePersistence = SyncJobStatePersistence.getInstance();
+
+    private String scheduleInfo;
 
     public static SyncRunner getInstance() {
         if(instance == null) {
@@ -240,17 +243,18 @@ public class SyncRunner extends Thread {
         }
 
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        log.info(String.format("Schedule: next job to run is \"%s\" (prio %d%s)%s",
+        scheduleInfo = String.format("next job to run is \"%s\" (prio %d%s)%s",
                 info.filesetToRun.getName(),
                 info.filesetToRun.getPriority(),
                 STATE_SUSPENDED.equals(info.filesetToRunState.getCurrentState()) ? ", was suspended" : "",
-                info.startTime == null ? ", immediately" : ", at " + sdf.format(info.startTime)));
+                info.startTime == null ? ", immediately" : ", at " + sdf.format(info.startTime));
         if(info.nextHigherPriorityFileset != null) {
-            log.info(String.format("Until higher priority job \"%s\" (prio %d) is scheduled to start at %s",
+            scheduleInfo = scheduleInfo + String.format(", until higher priority job \"%s\" (prio %d) is scheduled to start at %s",
                     info.nextHigherPriorityFileset.getName(),
                     info.nextHigherPriorityFileset.getPriority(),
-                    sdf.format(info.higherPriorityStartTime)));
+                    sdf.format(info.higherPriorityStartTime));
         }
+        log.info(StringUtils.capitalize(scheduleInfo));
 
         return info;
     }
@@ -261,6 +265,8 @@ public class SyncRunner extends Thread {
 
             if(schedule.startTime != null) {
                 try {
+                    AppState.updateMode("waiting, " + scheduleInfo);
+                    Reporting.reportState(true);
                     Thread.sleep(Math.max(1000, schedule.startTime.getTime() - new Date().getTime() + 500));
                 } catch(InterruptedException e) {
                     if(Shutdown.isHappening()) {
