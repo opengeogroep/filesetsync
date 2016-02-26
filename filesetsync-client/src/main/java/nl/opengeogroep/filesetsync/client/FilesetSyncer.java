@@ -200,6 +200,7 @@ public class FilesetSyncer {
 
             log.info("Sync job complete");
             state.endRun(STATE_COMPLETED);
+            AppState.updateCurrentFileset(null);
 
             String exitCodeAfterUpdate = fs.getProperty("exitCodeAfterUpdate");
             if(exitCodeAfterUpdate != null && filesUpdated) {
