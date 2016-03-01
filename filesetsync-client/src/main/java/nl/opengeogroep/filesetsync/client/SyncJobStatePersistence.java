@@ -83,11 +83,12 @@ public class SyncJobStatePersistence implements Serializable {
                 }
             } catch(InvalidClassException ice) {
                 log.info("Saved sync job state saved by incompatible version, starting with new state");
-                instance = new SyncJobStatePersistence();
             } catch(Exception e) {
                 log.error("Error reading sync job state from " + f.getAbsolutePath() + ", starting with new state", e);
-                instance = new SyncJobStatePersistence();
             } finally {
+                if(instance == null) {
+                    instance = new SyncJobStatePersistence();
+                }
                 IOUtils.closeQuietly(fis);
             }
         }
