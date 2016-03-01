@@ -104,7 +104,7 @@ public class Reporting {
                             }
 
                             String mac = getMacHex(ni);
-                            if(mac.startsWith("00:00")) {
+                            if(mac.startsWith("00:00") || mac.startsWith("02:02")) {
                                 continue;
                             }
 
