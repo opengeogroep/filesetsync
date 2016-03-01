@@ -18,6 +18,7 @@
 package nl.opengeogroep.filesetsync.client.config;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
@@ -281,6 +282,8 @@ public class Fileset {
         SyncJobState state = SyncJobStatePersistence.getInstance().getState(name, false);
         if(state != null) {
             j.put("state", state.toJSON());
+            Date nextScheduled = state.calculateNextRunDate(this);
+            j.put("next_scheduled", nextScheduled == null ? "ASAP" : nextScheduled.getTime());
         }
         return j;
     }
