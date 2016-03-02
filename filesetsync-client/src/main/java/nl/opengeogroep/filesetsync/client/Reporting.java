@@ -23,7 +23,10 @@ import java.lang.management.RuntimeMXBean;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import nl.opengeogroep.filesetsync.client.util.HttpClientUtil;
@@ -91,8 +94,8 @@ public class Reporting {
                 }
 
                 if(machineId == null) {
+                    List<NetworkInterface> candidateMacs = new ArrayList<>();
                     for(NetworkInterface ni: Collections.list(NetworkInterface.getNetworkInterfaces())) {
-
                         try {
                             if(ni.getHardwareAddress() == null || ni.isLoopback() || ni.isVirtual()) {
                                 continue;
@@ -107,13 +110,28 @@ public class Reporting {
                             if(mac == null) {
                                 continue;
                             }
+                            log.trace(String.format("Adding candidate network interface: hw index %d, name %s, display name %s, mac %s",
+                                    ni.getIndex(), ni.getName(), ni.getDisplayName(), mac));
+                            candidateMacs.add(ni);
 
-                            machineId = mac;
-                            log.debug(String.format( "Using machine id from network interface %s (%s) MAC: %s", ni.getName(), ni.getDisplayName(), machineId));
                             break;
                         } catch(Exception e) {
                         }
                     }
+
+                    if(!candidateMacs.isEmpty()) {
+                        Collections.sort(candidateMacs, new Comparator<NetworkInterface>() {
+                            @Override
+                            public int compare(NetworkInterface lhs, NetworkInterface rhs) {
+                                return lhs.getName().compareTo(rhs.getName());
+                            }
+                        });
+
+                        NetworkInterface ni = candidateMacs.get(0);
+                        machineId = getMacHex(ni);
+                        log.debug(String.format( "Using machine id from network interface %s (%s) MAC: %s", ni.getName(), ni.getDisplayName(), machineId));
+                    }
+
                 }
                 if(machineId == null) {
                     log.debug("Could not determine machineId");
