@@ -104,7 +104,7 @@ public class Reporting {
                             }
 
                             String mac = getMacHex(ni);
-                            if(mac.startsWith("00:00") || mac.startsWith("02:02")) {
+                            if(mac == null) {
                                 continue;
                             }
 
@@ -137,7 +137,11 @@ public class Reporting {
             }
             sb.append(String.format("%02x", b));
         }
-        return sb.toString();
+        String mac = sb.toString();
+        if(mac.startsWith("00:00") || mac.startsWith("02:02")) {
+            return null;
+        }
+        return mac;
     }
 
     public static String getClientId() {
