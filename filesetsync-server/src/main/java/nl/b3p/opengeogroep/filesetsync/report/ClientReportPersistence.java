@@ -33,25 +33,25 @@ public class ClientReportPersistence {
     public static final String REPORT_STATE = "state";
     public static final String REPORT_JOB_LOG = "job_log";
 
-    public static final void saveClientReport(String clientId, String machineId, String type, String ip, JSONObject report) throws NamingException, SQLException, JSONException {
+    public static final void saveClientReport(String clientId, String type, String ip, JSONObject report) throws NamingException, SQLException, JSONException {
 
         if(REPORT_STARTUP.equals(type)) {
             long startTime = report.getLong("start_time");
-            qr().update("delete from client_startup where client_id=? and machine_id=? and start_time = to_timestamp(?)", clientId, machineId, startTime);
-            qr().insert("insert into client_startup(client_id, machine_id, start_time, report) values (?, ?, to_timestamp(?), ?::json)", new ScalarHandler(), clientId, machineId, startTime, report.toString());
+            qr().update("delete from client_startup where client_id=? and start_time = to_timestamp(?)", clientId, startTime);
+            qr().insert("insert into client_startup(client_id, start_time, report) values (?, to_timestamp(?), ?::json)", new ScalarHandler(), clientId, startTime, report.toString());
         } else if(REPORT_STATE.equals(type)) {
-            qr().update("delete from client_state where client_id=? and machine_id=?", clientId, machineId);
-            qr().insert("insert into client_state(client_id, machine_id, report_time, ip, current_state) values (?, ?, to_timestamp(?), ?, ?::json)",
+            qr().update("delete from client_state where client_id=?", clientId);
+            qr().insert("insert into client_state(client_id, report_time, ip, current_state) values (?, to_timestamp(?), ?, ?::json)",
                     new ScalarHandler(),
-                    clientId, machineId, System.currentTimeMillis() / 1000.0, ip, report.toString());
+                    clientId, System.currentTimeMillis() / 1000.0, ip, report.toString());
         } else if(REPORT_JOB_LOG.equals(type)) {
             String job = report.getString("job");
             long startTime = report.getLong("start_time");
 
-            qr().update("delete from client_job_log where client_id=? and machine_id=? and job=? and start_time=to_timestamp(?)", clientId, machineId, job, startTime);
-            qr().insert("insert into client_job_log(client_id, machine_id, job, start_time, log) values (?, ?, ?, to_timestamp(?), ?::json)",
+            qr().update("delete from client_job_log where client_id=? and job=? and start_time=to_timestamp(?)", clientId, job, startTime);
+            qr().insert("insert into client_job_log(client_id, job, start_time, log) values (?, ?, to_timestamp(?), ?::json)",
                     new ScalarHandler(),
-                    clientId, machineId, job, startTime, report.toString());
+                    clientId, job, startTime, report.toString());
 
         } else {
             throw new IllegalArgumentException("Invalid report type: " + type);

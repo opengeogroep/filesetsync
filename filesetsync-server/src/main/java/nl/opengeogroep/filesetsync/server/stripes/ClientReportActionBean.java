@@ -19,11 +19,9 @@ package nl.opengeogroep.filesetsync.server.stripes;
 import javax.servlet.http.HttpServletResponse;
 import net.sourceforge.stripes.action.ActionBean;
 import net.sourceforge.stripes.action.ActionBeanContext;
-import net.sourceforge.stripes.action.After;
 import net.sourceforge.stripes.action.Resolution;
 import net.sourceforge.stripes.action.StrictBinding;
 import net.sourceforge.stripes.action.UrlBinding;
-import net.sourceforge.stripes.controller.LifecycleStage;
 import net.sourceforge.stripes.validation.Validate;
 import nl.b3p.opengeogroep.filesetsync.report.ClientReportPersistence;
 import nl.b3p.web.stripes.ErrorMessageResolution;
@@ -44,9 +42,6 @@ public class ClientReportActionBean implements ActionBean {
 
     @Validate
     private String clientId;
-
-    @Validate
-    private String machineId;
 
     @Validate
     private String type;
@@ -73,14 +68,6 @@ public class ClientReportActionBean implements ActionBean {
         this.clientId = clientId;
     }
 
-    public String getMachineId() {
-        return machineId;
-    }
-
-    public void setMachineId(String machineId) {
-        this.machineId = machineId;
-    }
-
     public String getReport() {
         return report;
     }
@@ -98,23 +85,16 @@ public class ClientReportActionBean implements ActionBean {
     }
     // </editor-fold>
 
-    @After(stages = LifecycleStage.BindingAndValidation)
-    public void checkMachineId() {
-        if(machineId == null) {
-            machineId = getContext().getRequest().getRemoteAddr();
-        }
-    }
-
     public Resolution save() {
         String ip = getContext().getRequest().getRemoteAddr();
-        String msg = String.format("client %s report for client %s, machine %s, from ip: %s", type, clientId, machineId, ip);
+        String msg = String.format("client %s report for client %s from ip: %s", type, clientId, ip);
         if(log.isTraceEnabled()) {
             log.trace("Received " + msg + ": " + report);
         }
         try {
             JSONObject reportJson = new JSONObject(report);
 
-            ClientReportPersistence.saveClientReport(clientId, machineId, type, ip, reportJson);
+            ClientReportPersistence.saveClientReport(clientId, type, ip, reportJson);
             log.info("Stored " + msg);
 
             return new ErrorMessageResolution(HttpServletResponse.SC_OK, type + " report stored");

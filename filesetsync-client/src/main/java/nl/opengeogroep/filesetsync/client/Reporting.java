@@ -21,12 +21,6 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
 import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
 import java.util.Map;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
 import nl.opengeogroep.filesetsync.client.util.HttpClientUtil;
@@ -51,7 +45,7 @@ public class Reporting {
 
     private static final Log log = LogFactory.getLog(Reporting.class);
 
-    private static String clientId, machineId;
+    private static String clientId;
 
     private static boolean startupReportSent = false;
     private static JSONObject startupReport;
@@ -81,99 +75,13 @@ public class Reporting {
                 }
             }
         }
-
-        if(machineId == null) {
-            try {
-                try {
-                    NetworkInterface ni = NetworkInterface.getByInetAddress(InetAddress.getLocalHost());
-                    machineId = getMacHex(ni);
-                    if(machineId != null) {
-                        log.debug(String.format("Using machine id from local network interface %s (%s) MAC: %s", ni.getName(), ni.getDisplayName(), machineId));
-                    }
-                } catch(Exception e) {
-                }
-
-                if(machineId == null) {
-                    List<NetworkInterface> candidateMacs = new ArrayList<>();
-                    for(NetworkInterface ni: Collections.list(NetworkInterface.getNetworkInterfaces())) {
-                        try {
-                            if(ni.getHardwareAddress() == null || ni.isLoopback() || ni.isVirtual()) {
-                                continue;
-                            }
-
-                            String name = ni.getName();
-                            if(name.startsWith("vir") || name.startsWith("net") || name.startsWith("ppp")) {
-                                continue;
-                            }
-
-                            String mac = getMacHex(ni);
-                            if(mac == null) {
-                                continue;
-                            }
-                            log.trace(String.format("Adding candidate network interface: hw index %d, name %s, display name %s, mac %s",
-                                    ni.getIndex(), ni.getName(), ni.getDisplayName(), mac));
-                            candidateMacs.add(ni);
-
-                            break;
-                        } catch(Exception e) {
-                        }
-                    }
-
-                    if(!candidateMacs.isEmpty()) {
-                        Collections.sort(candidateMacs, new Comparator<NetworkInterface>() {
-                            @Override
-                            public int compare(NetworkInterface lhs, NetworkInterface rhs) {
-                                return lhs.getName().compareTo(rhs.getName());
-                            }
-                        });
-
-                        NetworkInterface ni = candidateMacs.get(0);
-                        machineId = getMacHex(ni);
-                        log.debug(String.format( "Using machine id from network interface %s (%s) MAC: %s", ni.getName(), ni.getDisplayName(), machineId));
-                    }
-
-                }
-                if(machineId == null) {
-                    log.debug("Could not determine machineId");
-                    machineId = "<unknown>";
-                }
-            } catch(Exception e) {
-                machineId = "<unknown>";
-            }
-            log.info("Using machine id: " + machineId);
-        }
-    }
-
-    private static String getMacHex(NetworkInterface ni) throws SocketException {
-        if(ni == null || ni.getHardwareAddress() == null) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder(18);
-        for(byte b: ni.getHardwareAddress()) {
-            if(sb.length() > 0) {
-                sb.append(":");
-            }
-            sb.append(String.format("%02x", b));
-        }
-        String mac = sb.toString();
-        if(mac.startsWith("00:00") || mac.startsWith("02:02")) {
-            return null;
-        }
-        return mac;
     }
 
     public static String getClientId() {
-        if(clientId == null || machineId == null) {
+        if(clientId == null) {
             initDefaultIds();
         }
         return clientId;
-    }
-
-    public static String getMachineId() {
-        if(clientId == null || machineId == null) {
-            initDefaultIds();
-        }
-        return machineId;
     }
 
     private static boolean sendReport(final String type, final JSONObject report) {
@@ -184,7 +92,6 @@ public class Reporting {
                     .addParameter("type", type)
                     .addParameter("report", report.toString(4))
                     .addParameter("clientId", clientId)
-                    .addParameter("machineId", machineId)
                     .build();
 
         log.trace("> " + post.getRequestLine());
