@@ -31,7 +31,6 @@ import org.json.JSONObject;
 public class ClientReportPersistence {
     public static final String REPORT_STARTUP = "startup";
     public static final String REPORT_STATE = "state";
-    public static final String REPORT_JOB_LOG = "job_log";
 
     public static final void saveClientReport(String clientId, String type, String ip, JSONObject report) throws NamingException, SQLException, JSONException {
 
@@ -44,15 +43,6 @@ public class ClientReportPersistence {
             qr().insert("insert into client_state(client_id, report_time, ip, current_state) values (?, to_timestamp(?), ?, ?::json)",
                     new ScalarHandler(),
                     clientId, System.currentTimeMillis() / 1000.0, ip, report.toString());
-        } else if(REPORT_JOB_LOG.equals(type)) {
-            String job = report.getString("job");
-            long startTime = report.getLong("start_time");
-
-            qr().update("delete from client_job_log where client_id=? and job=? and start_time=to_timestamp(?)", clientId, job, startTime);
-            qr().insert("insert into client_job_log(client_id, job, start_time, log) values (?, ?, to_timestamp(?), ?::json)",
-                    new ScalarHandler(),
-                    clientId, job, startTime, report.toString());
-
         } else {
             throw new IllegalArgumentException("Invalid report type: " + type);
         }
