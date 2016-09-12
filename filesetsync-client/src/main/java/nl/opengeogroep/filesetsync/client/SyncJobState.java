@@ -338,7 +338,7 @@ public class SyncJobState implements Serializable {
     }
 
     public Date calculateNextRunDate(Fileset fs) {
-        if(lastRun == null || UNFINISHED_STATES.contains(currentState) || SCHEDULE_HOURLY.equals(fs.getSchedule())) {
+        if(lastRun == null || UNFINISHED_STATES.contains(currentState) || SCHEDULE_ONCE.equals(fs.getSchedule())) {
             return null;
         } else {
             Calendar c = GregorianCalendar.getInstance();
