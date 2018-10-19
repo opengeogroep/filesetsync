@@ -32,6 +32,7 @@ import nl.opengeogroep.filesetsync.FileRecord;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_FILE;
 import nl.opengeogroep.filesetsync.FileRecordListDirectoryIterator;
+import static nl.opengeogroep.filesetsync.client.ServerTooBusyException.SC_TOO_MANY_REQUESTS;
 import static nl.opengeogroep.filesetsync.client.SyncJobState.*;
 import nl.opengeogroep.filesetsync.client.config.Fileset;
 import nl.opengeogroep.filesetsync.client.config.SyncConfig;
@@ -209,6 +210,18 @@ public class FilesetSyncer {
                 SyncJobStatePersistence.persist();
                 System.exit(code);
             }
+        } catch(ServerTooBusyException e) {
+            state.setBusyFailedTries(state.getBusyFailedTries()+1);
+            if(state.getBusyFailedTries() >= fs.getMaxTries()) {
+                String msg = "Server too busy but max retries reached after " + state.getBusyFailedTries() + ", times, fatal error";
+                log.error(msg);
+                state.endRun(STATE_ERROR, msg);
+                AppState.updateCurrentFileset(null);
+            } else {
+                String msg = String.format("%s, retrying later after %d seconds (try %d of max %d)", e.getBodyMessage(), e.getRetryAfter(), state.getBusyFailedTries(), fs.getMaxTries());
+                log.error(msg);
+                state.endRun(STATE_RETRY, msg, e.getRetryAfter());
+            }
         } catch(IOException e) {
             state.setFailedTries(state.getFailedTries()+1);
 
@@ -283,6 +296,20 @@ public class FilesetSyncer {
                     log.debug("< " + hr.getStatusLine());
 
                     int status = hr.getStatusLine().getStatusCode();
+
+                    if(status == SC_TOO_MANY_REQUESTS) {
+                        String message = EntityUtils.toString(hr.getEntity());
+                        EntityUtils.consumeQuietly(hr.getEntity());
+                        Integer retry = null;
+                        try {
+                            retry = Integer.parseInt(hr.getFirstHeader("Retry-After").getValue());
+                        } catch(Exception e) {
+                        }
+                        throw new ServerTooBusyException(hr.getStatusLine().toString(), message, retry);
+                    } else {
+                        state.setBusyFailedTries(0);
+                    }
+
                     if(status == SC_NOT_MODIFIED) {
                         return null;
                     } else if(status >= SC_OK && status < 300) {
@@ -676,6 +703,20 @@ public class FilesetSyncer {
                 }
 
                 int status = response.getStatusLine().getStatusCode();
+
+                if(status == SC_TOO_MANY_REQUESTS) {
+                    String message = EntityUtils.toString(response.getEntity());
+                    EntityUtils.consumeQuietly(response.getEntity());
+                    Integer retry = null;
+                    try {
+                        retry = Integer.parseInt(response.getFirstHeader("Retry-After").getValue());
+                    } catch(Exception e) {
+                    }
+                    throw new ServerTooBusyException(response.getStatusLine().toString(), message, retry);
+                } else {
+                    state.setBusyFailedTries(0);
+                }
+
                 if(status < 200 || status >= 300) {
                     throw new IOException(String.format("Server returned \"%s\" for request \"%s\", body: %s",
                             response.getStatusLine(),

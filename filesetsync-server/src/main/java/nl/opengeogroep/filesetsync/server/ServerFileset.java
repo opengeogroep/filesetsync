@@ -28,6 +28,10 @@ public class ServerFileset {
 
     private String listing;
 
+    private Double maxServerLoad;
+
+    private Integer retryAfter = 5 * 60;
+
     public String getName() {
         return name;
     }
@@ -50,5 +54,21 @@ public class ServerFileset {
 
     public void setListing(String listing) {
         this.listing = listing;
+    }
+
+    public Double getMaxServerLoad() {
+        return maxServerLoad;
+    }
+
+    public void setMaxServerLoad(Double maxServerLoad) {
+        this.maxServerLoad = maxServerLoad;
+    }
+
+    public Integer getRetryAfter() {
+        return retryAfter;
+    }
+
+    public void setRetryAfter(Integer retryAfter) {
+        this.retryAfter = retryAfter;
     }
 }

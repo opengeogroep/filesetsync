@@ -19,11 +19,14 @@ package nl.opengeogroep.filesetsync.server.stripes;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.OperatingSystemMXBean;
 import java.util.Collection;
 import java.util.Locale;
 import javax.servlet.http.HttpServletResponse;
 import net.sourceforge.stripes.action.After;
 import net.sourceforge.stripes.action.Resolution;
+import net.sourceforge.stripes.action.StreamingResolution;
 import net.sourceforge.stripes.controller.LifecycleStage;
 import net.sourceforge.stripes.validation.SimpleError;
 import net.sourceforge.stripes.validation.Validate;
@@ -44,6 +47,13 @@ import org.apache.commons.logging.LogFactory;
 public abstract class FilesetBaseActionBean extends RequestLoggerActionBean implements ValidationErrorHandler {
     private final Log log = LogFactory.getLog(getLogName());
 
+    /**
+     * HTTP status code: https://tools.ietf.org/html/rfc6585#section-4
+     */
+    private static final int SC_TOO_MANY_REQUESTS = 429;
+
+    private static final OperatingSystemMXBean osMXBean = (OperatingSystemMXBean)ManagementFactory.getOperatingSystemMXBean();
+
     private String filesetName;
 
     private String subPath;
@@ -52,6 +62,8 @@ public abstract class FilesetBaseActionBean extends RequestLoggerActionBean impl
     private String filesetPath;
 
     private ServerFileset fileset;
+
+    private String loadTooHighMessage = null;
 
     public String getFilesetName() {
         return filesetName;
@@ -110,6 +122,20 @@ public abstract class FilesetBaseActionBean extends RequestLoggerActionBean impl
             return;
         }
 
+        if(fileset.getMaxServerLoad() != null) {
+            double sysLoad = osMXBean.getSystemLoadAverage();
+            if(sysLoad > fileset.getMaxServerLoad()) {
+                log.warn(String.format("%s: system load of %.2f too high (limit for fileset %.2f), returning HTTP 429 Too Many Requests, retry after %ds",
+                        fileset.getName(),
+                        sysLoad,
+                        fileset.getMaxServerLoad(),
+                        fileset.getRetryAfter()));
+                loadTooHighMessage = String.format("System load of %.2f too high for fileset %s", sysLoad, fileset.getName());
+                getContext().getValidationErrors().addGlobalError(new SimpleError(loadTooHighMessage));
+                return;
+            }
+        }
+
         File filesetRoot = new File(fileset.getPath());
         if(!filesetRoot.exists()) {
             log.error("local path does not exist for requested fileset path " + filesetPath + ": " + fileset.getPath());
@@ -150,6 +176,17 @@ public abstract class FilesetBaseActionBean extends RequestLoggerActionBean impl
 
     @Override
     public Resolution handleValidationErrors(ValidationErrors errors) throws Exception {
+
+        if(loadTooHighMessage != null) {
+            return new StreamingResolution("text/plain", loadTooHighMessage) {
+                @Override
+                protected void stream(HttpServletResponse response) throws Exception {
+                    response.setStatus(SC_TOO_MANY_REQUESTS);
+                    response.addIntHeader("Retry-After", fileset.getRetryAfter());
+                    super.stream(response);
+                }
+            };
+        }
 
         String message = "";
         for(Collection<ValidationError> errColl: errors.values()) {

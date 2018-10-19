@@ -8,6 +8,11 @@
         <param-name>filesets_listings</param-name>
         <param-value>caches=/tmp/files.list,caches_vrh=/media/ssd/files/vrh/caches.listing</param-value>
     </context-param>
+    <context-param>
+        <param-name>filesets_maxserverload</param-name>
+        <param-value>caches=0.29,caches_vrh=0.49</param-value>
+    </context-param>
+
     <!-- Localization context for the likes of the <fmt:message> JSTL tag -->
     <context-param>
         <param-name>javax.servlet.jsp.jstl.fmt.localizationContext</param-name>

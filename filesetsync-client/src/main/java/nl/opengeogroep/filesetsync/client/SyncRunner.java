@@ -109,7 +109,11 @@ public class SyncRunner extends Thread {
 
         while(state.getCurrentState().equals(STATE_RETRY)) {
             // Max wait time is 60 minutes, minimum 0
-            int waitTime = Math.min(fs.getRetryWaitTime(), 60 * 1000);
+            int waitTime = Math.min(fs.getRetryWaitTime(), 60 * 60);
+            if(state.getBusyRetryAfter() != null) {
+                // Max busy retry wait time is 30 minutes
+                waitTime = Math.min(state.getBusyRetryAfter(), 30 * 60);
+            }
             try {
                 Thread.sleep(waitTime * 1000);
             } catch(InterruptedException e) {
@@ -120,7 +124,7 @@ public class SyncRunner extends Thread {
                 }
                 return;
             }
-            log.info("Retrying job after waiting");
+            log.info("Retrying job after waiting" + (state.getBusyRetryAfter() != null ? ", server was too busy" : ""));
             new FilesetSyncer(fs, endTime).sync();
         }
     }
@@ -136,6 +140,7 @@ public class SyncRunner extends Thread {
             // Keep scheduled, also on error
             state.setCurrentState(STATE_WAITING);
             state.setFailedTries(0);
+            state.setBusyFailedTries(0);
             SyncJobStatePersistence.persist();
 
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");

@@ -101,6 +101,10 @@ public class SyncJobState implements Serializable {
 
     private transient int failedTries;
 
+    private transient Integer busyRetryAfter;
+
+    private transient int busyFailedTries;
+
     private transient List<Header> requestHeaders;
 
     // <editor-fold defaultstate="collapsed" desc="getters and setters">
@@ -214,6 +218,22 @@ public class SyncJobState implements Serializable {
         this.failedTries = failedTries;
     }
 
+    public Integer getBusyRetryAfter() {
+        return busyRetryAfter;
+    }
+
+    public void setBusyRetryAfter(Integer busyRetryAfter) {
+        this.busyRetryAfter = busyRetryAfter;
+    }
+
+    public int getBusyFailedTries() {
+        return busyFailedTries;
+    }
+
+    public void setBusyFailedTries(int busyFailedTries) {
+        this.busyFailedTries = busyFailedTries;
+    }
+
     public List<Header> getRequestHeaders() {
         if(requestHeaders == null) {
             requestHeaders = new ArrayList();
@@ -308,6 +328,7 @@ public class SyncJobState implements Serializable {
     void startNewRun() {
         setLastRun(new Date());
         setCurrentState(STATE_STARTED);
+        setBusyRetryAfter(null);
 
         // Clean future fields if necessary, leave lastFinished at old value for now
 
@@ -316,6 +337,11 @@ public class SyncJobState implements Serializable {
 
     void endRun(String state) {
         endRun(state, null);
+    }
+
+    void endRun(String state, String details, Integer retryAfter) {
+        endRun(state, details);
+        this.busyRetryAfter = retryAfter;
     }
 
     void endRun(String state, String details) {
