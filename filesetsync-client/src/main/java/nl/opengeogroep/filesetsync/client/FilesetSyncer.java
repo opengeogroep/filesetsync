@@ -663,7 +663,7 @@ public class FilesetSyncer {
             new BufferedFileListEncoder(new GZIPOutputStream(b)).writeAll(chunkList).close();
 
             post.setEntity(new ByteArrayEntity(b.toByteArray()));
-            post.setHeader(HttpHeaders.CONTENT_TYPE, Protocol.FILELIST_MIME_TYPE);
+            post.setHeader(HttpHeaders.CONTENT_TYPE, Protocol.FILELIST_V2_MIME_TYPE);
             post.setHeader(HttpHeaders.CONTENT_ENCODING, "gzip");
             addExtraHeaders(post);
 
@@ -683,7 +683,7 @@ public class FilesetSyncer {
                             EntityUtils.toString(response.getEntity())));
                 }
 
-                try(MultiFileDecoder decoder = new MultiFileDecoder(response.getEntity().getContent(), 1)) {
+                try(MultiFileDecoder decoder = new MultiFileDecoder(response.getEntity().getContent(), 2)) {
                     int i = 0;
                     for(MultiFileHeader mfh: decoder) {
                         if(Shutdown.isHappening()) {
