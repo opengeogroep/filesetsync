@@ -2,11 +2,11 @@
 <web-app version="2.5" xmlns="http://java.sun.com/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
     <context-param>
         <param-name>filesets</param-name>
-        <param-value>onefile=/home/matthijsln/.bashrc,voertuigviewer=/var/www/html/nodeless_output,caches=/home/matthijsln/dev/dbk/caches,caches_hdd=/media/hdd/files/vrhm</param-value>
+        <param-value>onefile=/home/matthijsln/.bashrc,voertuigviewer=/var/www/html/nodeless_output,caches=/home/matthijsln/dev/dbk/caches,caches_vrh=/media/ssd/files/vrh/caches</param-value>
     </context-param>
     <context-param>
         <param-name>filesets_listings</param-name>
-        <param-value>caches=/tmp/files.list</param-value>
+        <param-value>caches=/tmp/files.list,caches_vrh=/media/ssd/files/vrh/caches.listing</param-value>
     </context-param>
     <!-- Localization context for the likes of the <fmt:message> JSTL tag -->
     <context-param>
