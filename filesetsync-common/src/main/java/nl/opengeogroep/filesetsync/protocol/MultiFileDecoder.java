@@ -18,14 +18,15 @@ import org.apache.http.HttpStatus;
 public class MultiFileDecoder implements Iterator<MultiFileHeader>, Iterable<MultiFileHeader>, AutoCloseable {
     private static final Log log = LogFactory.getLog(MultiFileDecoder.class);
 
-    final private DataInputStream in;
-
+    private final DataInputStream in;
+    private final int version;
     private MultiFileHeader next, previous;
 
     private IOException exception;
 
-    public MultiFileDecoder(InputStream in) {
+    public MultiFileDecoder(InputStream in, int version) {
         this.in = new DataInputStream(in);
+        this.version = version;
     }
 
     public DataInputStream getDataStream() {
@@ -57,11 +58,8 @@ public class MultiFileDecoder implements Iterator<MultiFileHeader>, Iterable<Mul
         }
 
         try {
-            next = new MultiFileHeader(in);
-            if(next.status == HttpStatus.SC_NO_CONTENT) {
-                return false;
-            }
-            return true;
+            next = new MultiFileHeader(in, version);
+            return next.status != HttpStatus.SC_NO_CONTENT;
         } catch(EOFException e) {
             log.error("Unexpected EOF (No content header expected)");
             exception = e;

@@ -35,6 +35,7 @@ import nl.opengeogroep.filesetsync.protocol.MultiFileEncoder;
 import static nl.opengeogroep.filesetsync.protocol.MultiFileEncoder.MULTIFILE_MIME_TYPE;
 import nl.opengeogroep.filesetsync.protocol.Protocol;
 import static nl.opengeogroep.filesetsync.protocol.Protocol.FILELIST_MIME_TYPE;
+import static nl.opengeogroep.filesetsync.protocol.Protocol.FILELIST_V2_MIME_TYPE;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.commons.lang3.mutable.MutableInt;
@@ -61,7 +62,17 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
         String logPrefix = getFilesetName() + (getSubPath().length() != 0 ? getSubPath() : "") + " get:";
 
         Iterable<FileRecord> filesToStream;
-        if(FILELIST_MIME_TYPE.equals(getContext().getRequest().getContentType())) {
+
+        boolean isFileList = false;
+        int version = 1;
+        String contentType = getContext().getRequest().getContentType();
+        if(FILELIST_MIME_TYPE.equals(contentType)) {
+            isFileList = true;
+        } else if(FILELIST_V2_MIME_TYPE.equals(contentType)) {
+            isFileList = true;
+            version = 2;
+        }
+        if(isFileList) {
 
             InputStream in = getContext().getRequest().getInputStream();
             if("gzip".equals(getContext().getRequest().getHeader(HttpHeaders.CONTENT_ENCODING))) {
@@ -113,17 +124,19 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
             filesToStream = FileRecord.getFileRecordsInDir(getLocalSubPath(), null, new MutableInt());
         }
 
-        return new MultiFileStreamingResolution(logPrefix, filesToStream);
+        return new MultiFileStreamingResolution(logPrefix, filesToStream, version);
     }
 
     private class MultiFileStreamingResolution extends StreamingResolution {
-        final private Iterable<FileRecord> fileRecords;
-        private String logPrefix;
+        private final Iterable<FileRecord> fileRecords;
+        private final String logPrefix;
+        private final int version;
 
-        public MultiFileStreamingResolution(String logPrefix,  Iterable<FileRecord> fileRecords) {
+        public MultiFileStreamingResolution(String logPrefix, Iterable<FileRecord> fileRecords, int version) {
             super(MULTIFILE_MIME_TYPE);
             this.logPrefix = logPrefix;
             this.fileRecords = fileRecords;
+            this.version = version;
         }
 
         @Override
@@ -141,7 +154,7 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
                 uncompressedCounter = compressedCounter;
             }
 
-            final MultiFileEncoder streamer = new MultiFileEncoder(uncompressedCounter, log);
+            final MultiFileEncoder streamer = new MultiFileEncoder(uncompressedCounter, version, log);
 
             long startTime = System.currentTimeMillis();
             try {

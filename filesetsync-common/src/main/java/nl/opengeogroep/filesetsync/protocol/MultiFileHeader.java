@@ -24,10 +24,13 @@ public class MultiFileHeader {
     final Map<String,String> headers = new HashMap();
 
     final InputStream input;
+    final int version;
+    final HttpUtil httpUtil = new HttpUtil();
 
-    public MultiFileHeader(DataInputStream in) throws IOException {
-        status = in.readInt();
-        statusLine = in.readUTF();
+    public MultiFileHeader(DataInputStream in, int version) throws IOException {
+        this.status = in.readInt();
+        this.statusLine = in.readUTF();
+        this.version = version;
 
         while(true) {
             String header = in.readUTF();
@@ -35,10 +38,10 @@ public class MultiFileHeader {
                 break;
             }
             String value = in.readUTF();
-            headers.put(header, value);
+            this.headers.put(header, value);
         }
 
-        input = new BoundedInputStream(in, getContentLength());
+        this.input = new BoundedInputStream(in, getContentLength());
     }
 
     public int getStatus() {
@@ -79,12 +82,16 @@ public class MultiFileHeader {
         return headers.get(HttpHeaders.CONTENT_TYPE);
     }
 
-    public Date getLastModified() {
+    public long getLastModified() {
         String s = headers.get(HttpHeaders.LAST_MODIFIED);
         try {
-            return HttpUtil.parseDate(s);
+            if(version > 1) {
+                return Long.parseLong(s);
+            } else {
+                return httpUtil.parseDate(s).getTime();
+            }
         } catch (ParseException ex) {
-            return new Date();
+            return new Date().getTime();
         }
     }
 

@@ -26,6 +26,7 @@ public class Protocol {
 
     public static final String FILELIST_ENCODING = "UTF-8";
     public static final String FILELIST_MIME_TYPE = "application/x-filesetsync-filelist";
+    public static final String FILELIST_V2_MIME_TYPE = "application/x-filesetsync-filelist-v2";
     static final String FILELIST_HEADER_START = "filesetsync:filelist:start";
     static final String FILELIST_HEADER_END = "filesetsync:filelist:end";
 

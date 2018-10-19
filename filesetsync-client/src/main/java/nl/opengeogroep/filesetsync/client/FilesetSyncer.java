@@ -271,7 +271,7 @@ public class FilesetSyncer {
                     .addParameter("regexp", fs.getRegexp())
                     .build();
             if(cachedFileList) {
-                get.addHeader(HttpHeaders.IF_MODIFIED_SINCE, HttpUtil.formatDate(state.getFileListDate()));
+                get.addHeader(HttpHeaders.IF_MODIFIED_SINCE, new HttpUtil().formatDate(state.getFileListDate()));
             }
             addExtraHeaders(get);
             // Request poorly encoded text format
@@ -683,7 +683,7 @@ public class FilesetSyncer {
                             EntityUtils.toString(response.getEntity())));
                 }
 
-                try(MultiFileDecoder decoder = new MultiFileDecoder(response.getEntity().getContent())) {
+                try(MultiFileDecoder decoder = new MultiFileDecoder(response.getEntity().getContent(), 1)) {
                     int i = 0;
                     for(MultiFileHeader mfh: decoder) {
                         if(Shutdown.isHappening()) {
@@ -725,7 +725,7 @@ public class FilesetSyncer {
                                 log.info("mkdir     " + mfh.getFilename());
                             }
                             local.mkdirs();
-                            directoriesLastModifiedTimes.add(Pair.of(local, mfh.getLastModified().getTime()));
+                            directoriesLastModifiedTimes.add(Pair.of(local, mfh.getLastModified()));
                             continue;
                         }
 
@@ -747,7 +747,7 @@ public class FilesetSyncer {
                             log.error(String.format("Error writing to local file \"%s\": %s", fs.getLocal(), ExceptionUtils.getMessage(e)));
                             throw e;
                         }
-                        local.setLastModified(mfh.getLastModified().getTime());
+                        local.setLastModified(mfh.getLastModified());
                     }
                     if(decoder.getIOException() != null) {
                         throw decoder.getIOException();
