@@ -20,12 +20,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Date;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_FILE;
 import nl.opengeogroep.filesetsync.protocol.BufferedFileListEncoder;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 
 /**
