@@ -58,6 +58,7 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
     }
 
     public Resolution get() throws Exception {
+        String logPrefix = getFilesetName() + (getSubPath().length() != 0 ? getSubPath() : "") + " get:";
 
         Iterable<FileRecord> filesToStream;
         if(FILELIST_MIME_TYPE.equals(getContext().getRequest().getContentType())) {
@@ -87,7 +88,8 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
                     totalSize += localFile.length();
                 }
             }
-            log.info(String.format("streaming %d files (total %.0f KB)%s",
+            log.info(String.format("%s streaming %d files (total %.0f KB)%s",
+                    logPrefix,
                     requestedFiles.size(),
                     totalSize / 1024.0,
                     unacceptableFiles != 0 ? ", removed " + unacceptableFiles + " unacceptable requested files" : ""));
@@ -107,18 +109,20 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
                 return new ErrorMessageResolution("Error: path is not a file or directory");
             }
 
-            log.info("recursively streaming " + getLocalSubPath());
+            log.info(logPrefix + " recursively streaming ");
             filesToStream = FileRecord.getFileRecordsInDir(getLocalSubPath(), null, new MutableInt());
         }
 
-        return new MultiFileStreamingResolution(filesToStream);
+        return new MultiFileStreamingResolution(logPrefix, filesToStream);
     }
 
     private class MultiFileStreamingResolution extends StreamingResolution {
         final private Iterable<FileRecord> fileRecords;
+        private String logPrefix;
 
-        public MultiFileStreamingResolution(Iterable<FileRecord> fileRecords) {
+        public MultiFileStreamingResolution(String logPrefix,  Iterable<FileRecord> fileRecords) {
             super(MULTIFILE_MIME_TYPE);
+            this.logPrefix = logPrefix;
             this.fileRecords = fileRecords;
         }
 
@@ -163,7 +167,8 @@ public class FilesetGetActionBean extends FilesetBaseActionBean {
                 long compressedBytes = compressedCounter.getByteCount();
                 long uncompressedBytes = uncompressedCounter.getByteCount();
                 long duration = System.currentTimeMillis() - startTime;
-                log.info(String.format("streamed %d KB (uncompressed %d KB, ratio %.1f%%) in %s%s",
+                log.info(String.format("%s streamed %d KB (uncompressed %d KB, ratio %.1f%%) in %s%s",
+                        logPrefix,
                         compressedBytes / 1024,
                         uncompressedBytes / 1024,
                         Math.abs(100-(100.0/uncompressedBytes*compressedBytes)),

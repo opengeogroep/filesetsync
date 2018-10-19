@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Context antiJARLocking="true" path="/filesetsync-server">
-    <ResourceLink global="jdbc/filesetsync-server" name="jdbc/filesetsync-server" type="javax.sql.Datasource"/>
+  <ResourceLink global="jdbc/filesetsync-server" name="jdbc/filesetsync-server" type="javax.sql.Datasource"/>
 </Context>

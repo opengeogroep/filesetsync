@@ -18,11 +18,14 @@
 package nl.opengeogroep.filesetsync.server.stripes;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.StreamSupport;
 import java.util.zip.GZIPOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import net.sourceforge.stripes.action.ErrorResolution;
@@ -35,6 +38,7 @@ import nl.opengeogroep.filesetsync.FileRecord;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_DIRECTORY;
 import static nl.opengeogroep.filesetsync.FileRecord.TYPE_FILE;
 import nl.opengeogroep.filesetsync.protocol.BufferedFileListEncoder;
+import nl.opengeogroep.filesetsync.protocol.Protocol;
 import static nl.opengeogroep.filesetsync.protocol.Protocol.FILELIST_ENCODING;
 import nl.opengeogroep.filesetsync.server.FileHashCache;
 import nl.opengeogroep.filesetsync.server.ServerFileset;
@@ -62,6 +66,8 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
 
     @Validate
     private String regexp;
+
+    private String logPrefix;
 
     @Override
     protected final String getLogName() {
@@ -132,7 +138,7 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
                         try {
                             if(hash) {
                                 if(!hashLogMsg) {
-                                    log.debug("start hashing");
+                                    //log.trace("start hashing");
                                     hashLogMsg = true;
                                 }
                                 fr.setHash(FileHashCache.getCachedFileHash(fileset, fr.getFile(), fr.getLastModified(), hashBytes, hashTime));
@@ -177,7 +183,8 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
                     hashInfo = " (no hashing)";
                 }
 
-                log.info(String.format("listed %d directories and %d files, total size %d KB, time %s%s",
+                log.info(String.format("%s listed %d directories and %d files, total size %d KB, time %s%s",
+                        logPrefix,
                         dirs,
                         files,
                         totalBytes / 1024,
@@ -189,6 +196,7 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
     }
 
     public Resolution list() throws Exception {
+        logPrefix = getFilesetName() + (getSubPath().length() != 0 ? getSubPath() : "") + (regexp != null ? ",regex=" + regexp : "") + " list:";
 
         final ServerFileset theFileset = getFileset();
 
@@ -196,49 +204,72 @@ public class FilesetListActionBean extends FilesetBaseActionBean {
 
         long ifModifiedSince = getContext().getRequest().getDateHeader("If-Modified-Since");
 
-        if(ifModifiedSince == -1) {
-            log.info("listing " + getLocalSubPath());
-            // Stream file records directly to output without buffering all
-            // records in memory
-            // return new FilesetListingResolution(ServerFileset.getFileRecordsInDir(getLocalSubPath());
-            return new FilesetListingResolution(theFileset, FileRecord.getFileRecordsInDir(getLocalSubPath(), regexp, noRegexpMatches));
+        Iterable<FileRecord> fileRecordsIterable;
+
+        FileInputStream listing = null;
+        if(theFileset.getListing() != null) {
+            listing = new FileInputStream(theFileset.getListing());
+            fileRecordsIterable = Protocol.decodeFileListIterable(listing, getFileset().getPath(), getSubPath(), regexp, noRegexpMatches);
         } else {
-            // A conditional HTTP request with If-Modified-Since is checked
-            // against the latest last modified date of all the files and
-            // directories in the fileset.
+            fileRecordsIterable = FileRecord.getFileRecordsInDir(getLocalSubPath(), regexp, noRegexpMatches);
+        }
 
-            // Cache file records in case client cache is outdated and all
-            // records must be returned including the hash (not calculated yet)
+        // A conditional HTTP request with If-Modified-Since is checked
+        // against the latest last modified date of all the files and
+        // directories in the fileset.
 
-            // Note: if a file or directory is deleted, the modification time
-            // of the directory containing the file or directory is updated so
-            // deletions do trigger a cache invalidation. The root directory is
-            // included in the file list for this reason.
+        // When traversing to find the last modified date, cache file records in
+        // case client cache is outdated and all records must be returned
+        // including the hash (not calculated yet)
 
-            long lastModified = -1;
-            Collection<FileRecord> fileRecords = new ArrayList();
+        // Note: if a file or directory is deleted, the modification time
+        // of the directory containing the file or directory is updated so
+        // deletions do trigger a cache invalidation. The root directory is
+        // included in the file list for this reason.
+
+        long lastModified = -1;
+        String time;
+
+        if(listing != null) {
+            lastModified = new File(theFileset.getListing()).lastModified();
+            time = "used listing last modified time";
+        } else {
+            // Avoid traversing twice by saving the list, only possibly calculate hashes later
+            List<FileRecord> fileRecordsList = new ArrayList();
 
             String cacheDir = new File(FileHashCache.getCacheDir(theFileset.getName())).getCanonicalPath();
 
-            log.info("traverse " + getLocalSubPath());
+            //log.trace("list " + getLocalSubPath() + ": traversing for listing");
 
             long startTime = System.currentTimeMillis();
-            for(FileRecord fr: FileRecord.getFileRecordsInDir(getLocalSubPath(), regexp, noRegexpMatches)) {
+
+            for(FileRecord fr: fileRecordsIterable) {
                 if(fr.getFile().getCanonicalPath().startsWith(cacheDir)) {
                     continue;
                 }
-                fileRecords.add(fr);
+                fileRecordsList.add(fr);
                 lastModified = Math.max(lastModified, fr.getLastModified());
             }
-            log.info(String.format("traversed %d files and dirs%s", fileRecords.size(), regexp == null ? "" : ", filtered " + noRegexpMatches + " by regexp"));
-            String time = DurationFormatUtils.formatDurationWords(System.currentTimeMillis() - startTime, true, false);
+            log.info(String.format("%s traversed %d files and dirs to find last-modified%s", logPrefix, fileRecordsList.size(), regexp == null ? "" : ", filtered " + noRegexpMatches + " by regexp"));
+            time = "traversal took " + DurationFormatUtils.formatDurationWords(System.currentTimeMillis() - startTime, true, false);
+
+            fileRecordsIterable = fileRecordsList;
+        }
+        getContext().getResponse().setDateHeader("Last-Modified", lastModified);
+
+        if(ifModifiedSince == -1) {
+            log.info(String.format("%s no if-modified-since in request, listing%s with last-modified %tc", logPrefix, listing == null ? "" : " from cache", new Date(lastModified)));
+            return new FilesetListingResolution(theFileset, fileRecordsIterable);
+        } else {
             if(ifModifiedSince >= lastModified) {
-                log.info("not modified since " + dateToString(new Date(lastModified)) + ", took " + time);
+                log.info(String.format("%s not modified since %tc, %s, HTTP 304 sent", logPrefix,  new Date(lastModified), time));
+                if(listing != null) {
+                    listing.close();
+                }
                 return new ErrorResolution(HttpServletResponse.SC_NOT_MODIFIED);
             } else {
-                log.info("last modified date " + dateToString(new Date(lastModified)) + " later than client date of " + dateToString(new Date(ifModifiedSince)) + ", returning list (time " + time + ")");
-                // Avoid walking dirs twice, only calculate hashes
-                return new FilesetListingResolution(theFileset, fileRecords);
+                log.info(String.format("%s last modified date %tc later than client if-modified-since header of %tc, returning list, %s", logPrefix, lastModified, ifModifiedSince, time));
+                return new FilesetListingResolution(theFileset, fileRecordsIterable);
             }
         }
     }

@@ -4,6 +4,10 @@
         <param-name>filesets</param-name>
         <param-value>onefile=/home/matthijsln/.bashrc,voertuigviewer=/var/www/html/nodeless_output,caches=/home/matthijsln/dev/dbk/caches,caches_hdd=/media/hdd/files/vrhm</param-value>
     </context-param>
+    <context-param>
+        <param-name>filesets_listings</param-name>
+        <param-value>caches=/tmp/files.list</param-value>
+    </context-param>
     <!-- Localization context for the likes of the <fmt:message> JSTL tag -->
     <context-param>
         <param-name>javax.servlet.jsp.jstl.fmt.localizationContext</param-name>

@@ -106,7 +106,7 @@ public class FileHashCache implements ServletContextListener {
             try {
                 cacheManager = new CacheManager(cacheManagerConfig);
             } catch(CacheException e) {
-                log.error(String.format("Error creating cache for \"%s\" at directory \"%s\", hash cache disabled!", fs.getName(), cacheDir), e);
+                log.error(String.format("Error creating cache for \"%s\" at directory \"%s\", hash cache disabled! Cause: %s: %s", fs.getName(), cacheDir, e.getClass(), e.getMessage()));
                 continue;
             }
             cacheManagers.put(name, cacheManager);

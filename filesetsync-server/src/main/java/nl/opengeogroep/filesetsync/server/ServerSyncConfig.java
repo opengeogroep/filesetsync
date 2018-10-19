@@ -42,8 +42,14 @@ public class ServerSyncConfig implements ServletContextListener {
         return instance;
     }
 
-    public static void load(String configString) {
+    public static void load(String configString, String listingsConfig) {
         instance = new ServerSyncConfig();
+
+        Map<String,String> listings = new HashMap();
+        for(String s: listingsConfig.split(",")) {
+            String[] sp = s.split("=");
+            listings.put(sp[0], sp[1]);
+        }
 
         String[] sa = configString.split(",");
         for(String s: sa) {
@@ -51,6 +57,7 @@ public class ServerSyncConfig implements ServletContextListener {
             ServerFileset sfs = new ServerFileset();
             sfs.setName(sp[0]);
             sfs.setPath(sp[1]);
+            sfs.setListing(listings.get(sfs.getName()));
 
             File f = new File(sfs.getPath());
 
@@ -72,7 +79,7 @@ public class ServerSyncConfig implements ServletContextListener {
 
     @Override
     public void contextInitialized(ServletContextEvent sce) {
-        load(sce.getServletContext().getInitParameter("filesets"));
+        load(sce.getServletContext().getInitParameter("filesets"), sce.getServletContext().getInitParameter("filesets_listings"));
     }
 
     @Override

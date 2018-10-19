@@ -26,6 +26,8 @@ public class ServerFileset {
 
     private String path;
 
+    private String listing;
+
     public String getName() {
         return name;
     }
@@ -40,5 +42,13 @@ public class ServerFileset {
 
     public void setPath(String path) {
         this.path = path;
+    }
+
+    public String getListing() {
+        return listing;
+    }
+
+    public void setListing(String listing) {
+        this.listing = listing;
     }
 }
