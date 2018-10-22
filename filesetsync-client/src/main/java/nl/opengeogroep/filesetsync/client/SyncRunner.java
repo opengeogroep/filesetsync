@@ -174,7 +174,7 @@ public class SyncRunner extends Thread {
                 continue;
             }
             SyncJobState state = SyncJobStatePersistence.getInstance().getState(fs.getName(), true);
-            if(!(STATE_WAITING.equals(state.getCurrentState()) || STATE_SUSPENDED.equals(state.getCurrentState()))) {
+            if(!(STATE_WAITING.equals(state.getCurrentState()) || UNFINISHED_STATES.contains(state.getCurrentState()))) {
                 continue;
             }
 
@@ -228,7 +228,7 @@ public class SyncRunner extends Thread {
                 continue;
             }
             SyncJobState state = SyncJobStatePersistence.getInstance().getState(fs.getName(), true);
-            if(!STATE_WAITING.equals(state.getCurrentState())) {
+            if(!(STATE_WAITING.equals(state.getCurrentState()) || UNFINISHED_STATES.contains(state.getCurrentState()))) {
                 continue;
             }
 

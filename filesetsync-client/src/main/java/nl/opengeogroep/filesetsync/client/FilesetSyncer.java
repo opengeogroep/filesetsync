@@ -48,7 +48,9 @@ import nl.opengeogroep.filesetsync.util.HttpUtil;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.commons.lang3.mutable.Mutable;
 import org.apache.commons.lang3.mutable.MutableLong;
+import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.logging.Log;
@@ -132,14 +134,18 @@ public class FilesetSyncer {
             state.endRun(STATE_ERROR);
             return;
         }
-        boolean resume = STATE_SUSPENDED.equals(state.getCurrentState());
-        boolean aborted = STATE_ABORTED.equals(state.getCurrentState());
+        /* XXX resume currently works in same run when retrying, need to work out and test aborted/suspended/error */
+        boolean resume = STATE_SUSPENDED.equals(state.getCurrentState())
+                || STATE_RETRY.equals(state.getCurrentState())
+                || STATE_ABORTED.equals(state.getCurrentState())
+                || STATE_ERROR.equals(state.getCurrentState());
+        resume = resume && state.getResumeFileListIndex() != null;
 
         log.info(String.format("%s sync for job \"%s\", last started %s and %s %s",
-                resume ? "Resuming" : "Starting" + (aborted ? " previously aborted" : ""),
+                resume ? "Resuming" : "Starting",
                 fs.getName(),
                 state.getLastRun() == null ? "never" : "at " + dateToString(state.getLastRun()),
-                resume ? "suspended" : (aborted ? "aborted" : "finished"),
+                resume ? "last ended with state " + state.getCurrentState() : "finished",
                 state.getLastFinished() == null ? "never" : "at " + dateToString(state.getLastFinished())));
         if(log.isTraceEnabled()) {
             log.trace(fs);
@@ -200,6 +206,7 @@ public class FilesetSyncer {
             setDirectoriesLastModified();
 
             log.info("Sync job complete");
+            state.setResumeFileListIndex(null);
             state.endRun(STATE_COMPLETED);
             AppState.updateCurrentFileset(null);
 
@@ -277,6 +284,8 @@ public class FilesetSyncer {
         }
         action(s);
 
+        final Mutable<Date> serverLastModified = new MutableObject<>();
+
         try(CloseableHttpClient httpClient = HttpClientUtil.get()) {
             HttpUriRequest get = RequestBuilder.get()
                     .setUri(serverUrl + "list/" + fs.getRemote())
@@ -317,6 +326,10 @@ public class FilesetSyncer {
                         if(entity == null) {
                             throw new ClientProtocolException("No response entity, invalid server URL?");
                         }
+                        try {
+                            serverLastModified.setValue(new HttpUtil().parseDate(hr.getFirstHeader("Last-Modified").getValue()));
+                        } catch(Exception e) {
+                        }
                         try(InputStream in = entity.getContent()) {
                             return Protocol.decodeFilelist(in);
                         }
@@ -340,23 +353,20 @@ public class FilesetSyncer {
 
                 fileList = SyncJobState.readCachedFileList(fs.getName());
             } else {
-                log.info("Filelist returned " + fileList.size() + " files");
+                log.info("Filelist returned " + fileList.size() + " files, last modified: " + serverLastModified.getValue());
 
-                /* Calculate last modified client-side, requires less server
-                 * memory
-                 */
-
-                long lastModified = -1;
-                for(FileRecord fr: fileList) {
-                    lastModified = Math.max(lastModified, fr.getLastModified());
-                }
-                if(lastModified != -1) {
+                if(serverLastModified.getValue() != null) {
+                    /* Use server provided last modified date, can be different
+                     * from latest modified file in the list when a listing cache
+                     * file is used
+                     */
                     state.setFileListRemotePath(fs.getRemote());
-                    state.setFileListDate(new Date(lastModified));
+                    state.setFileListDate(new Date(serverLastModified.getValue().getTime()));
                     state.setFileListHashed(fs.isHash());
                     SyncJobState.writeCachedFileList(fs.getName(), fileList);
                     SyncJobStatePersistence.persist();
                 }
+
             }
         }
     }
@@ -660,6 +670,9 @@ public class FilesetSyncer {
                 }
                 return false;
             }
+
+            state.setResumeFileListIndex(index);
+            SyncJobStatePersistence.persist();
 
         } while(endIndex < fileList.size()-1);
 
