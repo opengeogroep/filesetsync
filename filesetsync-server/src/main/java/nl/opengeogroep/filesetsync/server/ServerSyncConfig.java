@@ -48,18 +48,25 @@ public class ServerSyncConfig implements ServletContextListener {
         Map<String,String> listings = new HashMap();
         for(String s: listingsConfig.split(",")) {
             String[] sp = s.split("=");
-            listings.put(sp[0], sp[1]);
+            if(sp.length > 1) {
+                listings.put(sp[0], sp[1]);
+            }
         }
 
         Map<String,Double> maxLoads = new HashMap();
         for(String s: maxLoadConfig.split(",")) {
             String[] sp = s.split("=");
-            maxLoads.put(sp[0], Double.parseDouble(sp[1]));
+            if(sp.length > 1) {
+                maxLoads.put(sp[0], Double.parseDouble(sp[1]));
+            }
         }
 
         String[] sa = configString.split(",");
         for(String s: sa) {
             String[] sp = s.split("=");
+            if(sp.length == 1) {
+                continue;
+            }
             ServerFileset sfs = new ServerFileset();
             sfs.setName(sp[0]);
             sfs.setPath(sp[1]);
