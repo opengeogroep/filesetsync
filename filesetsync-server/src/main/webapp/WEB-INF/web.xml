@@ -12,6 +12,10 @@
         <param-name>filesets_maxserverload</param-name>
         <param-value>caches=0.29,caches_vrh=0.49</param-value>
     </context-param>
+    <context-param>
+        <param-name>hashcache_dir</param-name>
+        <param-value>/var/opt/filesetsync-hashcache</param-value>
+    </context-param>
 
     <!-- Localization context for the likes of the <fmt:message> JSTL tag -->
     <context-param>

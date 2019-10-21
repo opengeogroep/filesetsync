@@ -56,12 +56,17 @@ public class FileHashCache implements ServletContextListener {
     private static final Log log = LogFactory.getLog(FileHashCache.class);
 
     private static final String CACHE_DIR = "filesetsync-hashcache";
+    private static String cacheDir;
 
     public static Map<String,CacheManager> cacheManagers = new HashMap();
     public static Map<String,Cache> caches = new HashMap();
 
     public static String getCacheDir(String name) {
-        return ServerSyncConfig.getInstance().getFileset(name).getPath() + File.separator + CACHE_DIR;
+        if(cacheDir == null) {
+            return ServerSyncConfig.getInstance().getFileset(name).getPath() + File.separator + CACHE_DIR;
+        } else {
+            return cacheDir + File.separator + name;
+        }
     }
 
     private static String getPersistedCacheFile(String name) {
@@ -71,6 +76,16 @@ public class FileHashCache implements ServletContextListener {
     @Override
     public void contextInitialized(ServletContextEvent sce) {
         log.info("*** initializing ***");
+
+        cacheDir = sce.getServletContext().getInitParameter("hashcache_dir");
+        if(cacheDir == null) {
+            log.warn("hashcache_dir context parameter not set, using tmp directory " + cacheDir);
+            cacheDir = System.getProperty("java.io.tmpdir");
+        }
+        if(!new File(cacheDir).isDirectory()) {
+            log.error("hashcache_dir not a directory: " + cacheDir);
+            cacheDir = null;
+        }
 
         int maxElementsInMemory = 10000;
         try {
