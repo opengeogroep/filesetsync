@@ -4,13 +4,13 @@
 
     <groupId>nl.opengeogroep.filesetsync</groupId>
     <artifactId>filesetsync-common</artifactId>
-    <version>1.5-SNAPSHOT</version>
+    <version>1.5</version>
     <packaging>jar</packaging>
 	
     <parent>
         <groupId>nl.opengeogroep.filesetsync</groupId>
         <artifactId>filesetsync</artifactId>
-        <version>1.5-SNAPSHOT</version>
+        <version>1.5</version>
     </parent>
     <name>filesetsync-common</name>
 
